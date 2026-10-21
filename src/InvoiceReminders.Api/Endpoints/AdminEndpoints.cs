@@ -20,7 +20,7 @@ internal static class AdminEndpoints
     private static async Task<Results<Ok<SeedResult>, ProblemHttpResult>> ResetAsync(
         IDemoDataSeeder seeder,
         IOptions<SeedOptions> options,
-        CancellationToken cancellationToken)
+        IHostApplicationLifetime lifetime)
     {
         if (!options.Value.AllowReset)
         {
@@ -30,6 +30,7 @@ internal static class AdminEndpoints
                 statusCode: StatusCodes.Status403Forbidden);
         }
 
-        return TypedResults.Ok(await seeder.SeedAsync(SeedMode.Always, cancellationToken));
+        // Como en la ejecución del proceso: cerrar la pestaña no debe dejar la base a medio reiniciar.
+        return TypedResults.Ok(await seeder.SeedAsync(SeedMode.Always, lifetime.ApplicationStopping));
     }
 }

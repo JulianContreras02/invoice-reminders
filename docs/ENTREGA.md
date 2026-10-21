@@ -125,14 +125,21 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| 1. Planeación | Decisiones confirmadas, ADR en borrador, esquema y semilla, plantillas de correo, esqueleto de la solución, elección del runner de pruebas | [PENDIENTE FASE 4] |
-| 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure Mongo → Infrastructure Email → Api → Docker → Frontend → Visual Studio | [PENDIENTE FASE 4] |
-| 3. Pruebas | Ensayo en clon limpio, escenario SMTP caído, tiempos | [PENDIENTE FASE 4] |
-| 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION con capturas, este PDF, tag | [PENDIENTE FASE 4] |
+| 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
+| 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
+| 3. Pruebas | 42 pruebas unitarias en verde; compilación estricta sin advertencias; arranque con configuración inválida verificado (código 1 y mensaje con la variable); guion completo automatizado en el CI | Parcial: [PENDIENTE FASE 3: primera ejecución del CI en GitHub, escenario SMTP caído en vivo] |
+| 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION, este documento | En curso: [PENDIENTE FASE 4: capturas, PDF y tag `v1.0.0`] |
 
-- Estado por requisito: [PENDIENTE FASE 4: tabla CA-01 … CA-17 con cumplido / parcial / no aplica].
+- Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. Los de lógica (CA-02 a CA-11, CA-15, CA-16) están cubiertos por pruebas unitarias; los de despliegue e interfaz (CA-01, CA-12, CA-13) los ejecuta el trabajo `compose-smoke` del CI. [PENDIENTE FASE 4: marcar cada uno tras la primera ejecución en verde y el ensayo manual con capturas.]
 - Capas opcionales: se incluyó CI con prueba de humo del compose. No se incluyeron integración con Testcontainers, `docker-compose.dcproj`, pruebas de componentes React ni el endpoint de detalle con historial; quedan en la sección 8.
-- Problemas encontrados y cómo se resolvieron: [PENDIENTE FASE 4: lista breve; incluir al menos por qué las pruebas usan el `dotnet test` clásico (VSTest), el `nuget.config` explícito y la dependencia transitiva `System.Security.Cryptography.Pkcs` fijada a 10.0.13 por avisos de seguridad].
+- Problemas encontrados y cómo se resolvieron:
+  - **Runner de pruebas.** xunit.v3 4.0 usa Microsoft Testing Platform por defecto, y con el SDK 10 eso cambia la sintaxis de `dotnet test` y su integración con VSTest. Se eligió `xunit.v3.mtp-off`, la variante oficial que deja el `dotnet test` clásico y el Explorador de pruebas sin configuración extra.
+  - **Codificación HTML de los correos.** `WebUtility.HtmlEncode` también codifica las letras acentuadas (`é` → `&#233;`). Una prueba que buscaba el nombre literal en el HTML habría fallado; ahora verifica solo la codificación del `&`, que es lo que protege el correo.
+  - **Restauración de NuGet dependiente de la máquina.** En un equipo sin orígenes configurados la restauración fallaba sin mensaje. Se añadió `nuget.config` con nuget.org explícito, para que el build sea igual en cualquier máquina.
+  - **Dependencia transitiva con avisos de seguridad.** MimeKit 4.18.1 trae `System.Security.Cryptography.Pkcs` 10.0.0 (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). Se fijó a 10.0.13 con Central Package Management en lugar de silenciar el aviso.
+  - **Comentario XML inválido.** Un comentario en `Directory.Build.props` contenía dos guiones seguidos y MSBuild no podía cargar el archivo; se reescribió.
+  - **Arranque ordenado con Mailpit.** Se comprobó en el Dockerfile oficial de Mailpit que su imagen declara un `HEALTHCHECK`, y la aplicación espera con `service_healthy` para que el indicador de salud arranque en verde.
+  - **Entorno sin Docker.** El equipo de desarrollo no tenía Docker; por eso el CI levanta el compose real y ejecuta el guion del revisor en cada push.
 
 ## 7. Guía de verificación
 

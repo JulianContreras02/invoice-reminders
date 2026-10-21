@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using InvoiceReminders.Application.Common;
 using InvoiceReminders.Application.Email;
 using InvoiceReminders.Application.Ports;
@@ -22,8 +21,14 @@ public sealed class ProcessRemindersUseCase(
     TimeProvider timeProvider,
     ILogger<ProcessRemindersUseCase> logger)
 {
+    private const string EmailFailedMessage = "El correo no se entregó; el estado no cambió.";
+    private const string UpdateFailedMessage = "El correo salió, pero no se pudo guardar el nuevo estado; la siguiente ejecución lo reintentará.";
+
     /// <param name="customerId">Cliente a procesar, o <c>null</c> para todos.</param>
-    /// <param name="cancellationToken">Se comprueba solo entre facturas: nunca entre el envío y la actualización.</param>
+    /// <param name="cancellationToken">
+    /// Apagado de la aplicación. Se atiende solo entre facturas y entre clientes: una factura que
+    /// empezó a procesarse termina su envío y su actualización (el SMTP tiene su propio tiempo límite).
+    /// </param>
     public async Task<ReminderRunResult> RunAsync(string? customerId, CancellationToken cancellationToken)
     {
         var runId = Guid.CreateVersion7();
@@ -33,41 +38,29 @@ public sealed class ProcessRemindersUseCase(
         var targets = await LoadTargetsAsync(customerId, cancellationToken);
         var outcomes = new List<InvoiceOutcome>();
         var customersProcessed = 0;
-        var cancelled = false;
+        var completion = RunCompletion.Completed;
 
         foreach (var customer in targets)
         {
-            // Entre clientes también: con el token cancelado la consulta al repositorio lanzaría en lugar de devolver el resultado parcial.
-            if (cancellationToken.IsCancellationRequested)
+            var (eligible, readCompletion) = await ReadEligibleAsync(customer, cancellationToken);
+            if (readCompletion != RunCompletion.Completed)
             {
-                cancelled = true;
+                completion = readCompletion;
                 break;
             }
 
-            var eligible = await invoices.GetEligibleByCustomerAsync(customer.Id, ReminderPolicy.EligibleStatuses, cancellationToken);
             customersProcessed++;
-
-            foreach (var invoice in eligible)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    cancelled = true;
-                    break;
-                }
-
-                outcomes.Add(await ProcessInvoiceAsync(customer, invoice, runId, cancellationToken));
-            }
-
-            if (cancelled)
+            completion = await ProcessCustomerAsync(customer, eligible, runId, outcomes, cancellationToken);
+            if (completion != RunCompletion.Completed)
             {
                 break;
             }
         }
 
-        var result = new ReminderRunResult(runId, startedAt, timeProvider.GetUtcNow() - startedAt, customerId, customersProcessed, cancelled, outcomes);
+        var result = new ReminderRunResult(runId, startedAt, timeProvider.GetUtcNow() - startedAt, customerId, customersProcessed, completion, outcomes);
         logger.LogInformation(
-            "Recordatorios {RunId}: {Candidates} candidatas, {Sent} enviados, {Updated} actualizadas, {Failed} fallidas, {Skipped} omitidas en {Duration}",
-            runId, result.Candidates, result.EmailsSent, result.Updated, result.Failed, result.Skipped, result.Duration);
+            "Recordatorios {RunId} ({Completion}): {Candidates} candidatas, {Sent} enviados, {Updated} actualizadas, {Failed} fallidas, {Skipped} omitidas en {Duration}",
+            runId, completion, result.Candidates, result.EmailsSent, result.Updated, result.Failed, result.Skipped, result.Duration);
         return result;
     }
 
@@ -84,52 +77,107 @@ public sealed class ProcessRemindersUseCase(
         return [single];
     }
 
-    private async Task<InvoiceOutcome> ProcessInvoiceAsync(Customer customer, Invoice invoice, Guid runId, CancellationToken cancellationToken)
+    private async Task<(IReadOnlyList<Invoice> Eligible, RunCompletion Completion)> ReadEligibleAsync(
+        Customer customer,
+        CancellationToken cancellationToken)
     {
-        if (!ReminderPolicy.TryGetTransition(invoice.Status, out var transition))
+        if (cancellationToken.IsCancellationRequested)
         {
-            return Outcome(customer, invoice, OutcomeKind.SkippedNotEligible, error: "El estado no tiene transición definida.");
+            return ([], RunCompletion.Cancelled);
         }
 
-        if (!MailAddress.TryCreate(customer.Email, out _))
+        try
         {
-            logger.LogWarning("Factura {InvoiceId} omitida: el cliente {CustomerId} no tiene un correo válido", invoice.Id, customer.Id);
+            var eligible = await invoices.GetEligibleByCustomerAsync(customer.Id, ReminderPolicy.EligibleStatuses, cancellationToken);
+            return (eligible, RunCompletion.Completed);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return ([], RunCompletion.Cancelled);
+        }
+#pragma warning disable CA1031 // El adaptador puede lanzar excepciones del driver que Application no conoce; se devuelve el resultado parcial.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            logger.LogError(ex, "No se pudieron leer las facturas del cliente {CustomerId}; el lote se detiene", customer.Id);
+            return ([], RunCompletion.StoppedPersistenceUnavailable);
+        }
+    }
+
+    private async Task<RunCompletion> ProcessCustomerAsync(
+        Customer customer,
+        IReadOnlyList<Invoice> eligible,
+        Guid runId,
+        List<InvoiceOutcome> outcomes,
+        CancellationToken cancellationToken)
+    {
+        foreach (var invoice in eligible)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return RunCompletion.Cancelled;
+            }
+
+            if (!ReminderPolicy.TryGetTransition(invoice.Status, out var transition))
+            {
+                // Imposible si el repositorio cumple su contrato (filtra por EligibleStatuses).
+                logger.LogError("El repositorio devolvió la factura {InvoiceId} en el estado no elegible {Status}", invoice.Id, invoice.Status);
+                continue;
+            }
+
+            var outcome = await ProcessInvoiceAsync(customer, invoice, transition, runId);
+            outcomes.Add(outcome);
+
+            if (outcome.Kind == OutcomeKind.UpdateFailedAfterSend)
+            {
+                // Con la persistencia caída, cada correo adicional sería un duplicado seguro.
+                return RunCompletion.StoppedPersistenceUnavailable;
+            }
+        }
+
+        return RunCompletion.Completed;
+    }
+
+    /// <summary>Una factura es una unidad de trabajo: no se cancela entre el envío y la actualización.</summary>
+    private async Task<InvoiceOutcome> ProcessInvoiceAsync(Customer customer, Invoice invoice, ReminderTransition transition, Guid runId)
+    {
+        if (!customer.HasDeliverableEmail())
+        {
+            logger.LogWarning("Factura {InvoiceId} omitida: el cliente {CustomerId} no tiene un correo entregable", invoice.Id, customer.Id);
             return Outcome(customer, invoice, OutcomeKind.SkippedNoEmail, error: "El cliente no tiene un correo válido.");
         }
 
         var message = composer.Compose(customer, invoice, transition, runId);
 
-        EmailDispatchResult dispatch;
         try
         {
-            dispatch = await emailSender.SendAsync(message, cancellationToken);
+            await emailSender.SendAsync(message, CancellationToken.None);
         }
         catch (EmailDeliveryException ex)
         {
             logger.LogWarning(ex, "No se envió el correo de la factura {InvoiceId} del cliente {CustomerId}; el estado no cambia", invoice.Id, customer.Id);
-            return Outcome(customer, invoice, OutcomeKind.EmailFailed, error: ex.Message);
+            return Outcome(customer, invoice, OutcomeKind.EmailFailed, error: EmailFailedMessage);
         }
 
-        var change = new StatusChange(runId, dispatch.MessageId, timeProvider.GetUtcNow(), StatusChange.ReminderReason);
+        var change = new StatusChange(runId, message.MessageId, timeProvider.GetUtcNow(), StatusChange.ReminderReason);
         try
         {
-            // El correo ya salió: la actualización no se cancela aunque la aplicación se esté deteniendo.
             var advanced = await invoices.TryAdvanceStatusAsync(invoice.Id, transition.From, transition.To, change, CancellationToken.None);
             if (!advanced)
             {
                 logger.LogWarning("La factura {InvoiceId} cambió de estado durante la ejecución; no se actualizó", invoice.Id);
-                return Outcome(customer, invoice, OutcomeKind.UpdateConflict, messageId: dispatch.MessageId, error: "Otro proceso cambió el estado antes.");
+                return Outcome(customer, invoice, OutcomeKind.UpdateConflict, messageId: message.MessageId, error: "Otro proceso cambió el estado antes.");
             }
         }
-#pragma warning disable CA1031 // El adaptador de persistencia puede lanzar excepciones del driver que Application no conoce; el lote no debe abortar.
+#pragma warning disable CA1031 // El adaptador de persistencia puede lanzar excepciones del driver que Application no conoce.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            logger.LogError(ex, "El correo {MessageId} de la factura {InvoiceId} salió pero el estado no se actualizó", dispatch.MessageId, invoice.Id);
-            return Outcome(customer, invoice, OutcomeKind.UpdateFailedAfterSend, messageId: dispatch.MessageId, error: ex.Message);
+            logger.LogError(ex, "El correo {MessageId} de la factura {InvoiceId} salió pero el estado no se actualizó", message.MessageId, invoice.Id);
+            return Outcome(customer, invoice, OutcomeKind.UpdateFailedAfterSend, messageId: message.MessageId, error: UpdateFailedMessage);
         }
 
-        return Outcome(customer, invoice, OutcomeKind.SentAndUpdated, newStatus: transition.To.Value, messageId: dispatch.MessageId);
+        return Outcome(customer, invoice, OutcomeKind.SentAndUpdated, newStatus: transition.To.Value, messageId: message.MessageId);
     }
 
     private static InvoiceOutcome Outcome(

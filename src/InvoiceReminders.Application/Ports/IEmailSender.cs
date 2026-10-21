@@ -3,8 +3,11 @@ using InvoiceReminders.Application.Email;
 
 namespace InvoiceReminders.Application.Ports;
 
-/// <summary>Transporte de correo. Contrato: devuelve el resultado del envío o lanza <see cref="EmailDeliveryException"/>; nunca un éxito parcial.</summary>
+/// <summary>
+/// Transporte de correo. Contrato: si la tarea termina sin excepción, el servidor aceptó el
+/// mensaje; ante cualquier fallo de transporte lanza <see cref="EmailDeliveryException"/>.
+/// </summary>
 public interface IEmailSender
 {
-    Task<EmailDispatchResult> SendAsync(EmailMessage message, CancellationToken cancellationToken);
+    Task SendAsync(EmailMessage message, CancellationToken cancellationToken);
 }

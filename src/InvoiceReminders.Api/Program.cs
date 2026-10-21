@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using InvoiceReminders.Api;
 using InvoiceReminders.Api.Concurrency;
 using InvoiceReminders.Api.Endpoints;
 using InvoiceReminders.Api.Errors;
@@ -14,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Composition root: el único lugar donde se conectan las capas (ADR 0002).
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddOptions<LinksOptions>().BindConfiguration(LinksOptions.SectionName);
 builder.Services.AddSingleton<OperationGate>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
@@ -26,7 +28,8 @@ var app = builder.Build();
 // termina con un mensaje claro en el log en vez de servir una interfaz vacía.
 try
 {
-    await app.Services.InitializeInfrastructureAsync(app.Lifetime.ApplicationStopping);
+    await using var startupScope = app.Services.CreateAsyncScope();
+    await startupScope.ServiceProvider.GetRequiredService<IInfrastructureInitializer>().InitializeAsync(app.Lifetime.ApplicationStopping);
 }
 #pragma warning disable CA1031 // Frontera del proceso: cualquier fallo de arranque debe registrarse y terminar con código distinto de cero.
 catch (Exception ex)

@@ -144,7 +144,7 @@ export function InvoicesPage() {
       )}
 
       <footer className="muted footer">
-        {meta && `Versión ${meta.version} · entorno ${meta.environment} · base ${meta.mongoDatabase} · SMTP ${meta.smtpHost}:${meta.smtpPort}`}
+        {meta && `Versión ${meta.version} · entorno ${meta.environment}`}
       </footer>
     </main>
   );

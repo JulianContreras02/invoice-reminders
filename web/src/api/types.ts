@@ -38,8 +38,9 @@ export type OutcomeKind =
   | 'EmailFailed'
   | 'UpdateConflict'
   | 'UpdateFailedAfterSend'
-  | 'SkippedNoEmail'
-  | 'SkippedNotEligible';
+  | 'SkippedNoEmail';
+
+export type RunCompletion = 'Completed' | 'Cancelled' | 'StoppedPersistenceUnavailable';
 
 export interface InvoiceOutcome {
   invoiceId: string;
@@ -59,7 +60,7 @@ export interface ReminderRunResult {
   duration: string;
   customerId: string | null;
   customersProcessed: number;
-  cancelled: boolean;
+  completion: RunCompletion;
   outcomes: InvoiceOutcome[];
   candidates: number;
   updated: number;
@@ -84,9 +85,6 @@ export interface Meta {
   environment: string;
   mailpitUrl: string | null;
   allowReset: boolean;
-  smtpHost: string;
-  smtpPort: number;
-  mongoDatabase: string;
 }
 
 export interface HealthCheck {

@@ -109,18 +109,54 @@ public sealed class ProcessRemindersUseCaseTests
     }
 
     [Fact]
-    public async Task RunAsync_UpdateFailsAfterSending_ReportsItWithTheMessageId()
+    public async Task RunAsync_UpdateFailsAfterSending_ReportsItWithTheMessageIdAndNoInternalDetails()
     {
         _customers.Add(Perez);
         _invoices.Add(NewInvoice("FAC-1", Perez, InvoiceStatus.FirstReminder));
-        _invoices.FailUpdatesWith(new TimeoutException("MongoDB no responde"));
+        _invoices.FailUpdatesWith(new TimeoutException("MongoDB no responde en mongo:27017"));
 
         var result = await CreateSut().RunAsync(null, Ct);
 
         var outcome = Assert.Single(result.Outcomes);
         Assert.Equal(OutcomeKind.UpdateFailedAfterSend, outcome.Kind);
         Assert.Equal(Assert.Single(_sender.Sent).MessageId, outcome.MessageId);
-        Assert.Equal("MongoDB no responde", outcome.Error);
+        Assert.DoesNotContain("mongo", outcome.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunAsync_UpdateFailsAfterSending_StopsSendingFurtherEmails()
+    {
+        _customers.Add(Perez, Rodriguez);
+        _invoices.Add(
+            NewInvoice("FAC-1", Perez, InvoiceStatus.FirstReminder),
+            NewInvoice("FAC-2", Perez, InvoiceStatus.SecondReminder),
+            NewInvoice("FAC-3", Rodriguez, InvoiceStatus.FirstReminder));
+        _invoices.FailUpdatesWith(new TimeoutException("MongoDB no responde"));
+
+        var result = await CreateSut().RunAsync(null, Ct);
+
+        Assert.Single(_sender.Sent);
+        Assert.Equal(RunCompletion.StoppedPersistenceUnavailable, result.Completion);
+        Assert.True(result.HasFailures);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReadingACustomerFails_StopsAndKeepsWhatWasAlreadyDone()
+    {
+        _customers.Add(Perez, Rodriguez, Gomez);
+        _invoices.Add(
+            NewInvoice("FAC-1", Perez, InvoiceStatus.FirstReminder),
+            NewInvoice("FAC-2", Rodriguez, InvoiceStatus.FirstReminder),
+            NewInvoice("FAC-3", Gomez, InvoiceStatus.FirstReminder));
+        _invoices.FailReadsFor(Rodriguez.Id, new TimeoutException("MongoDB no responde"));
+
+        var result = await CreateSut().RunAsync(null, Ct);
+
+        Assert.Equal(RunCompletion.StoppedPersistenceUnavailable, result.Completion);
+        Assert.Equal("FAC-1", Assert.Single(result.Outcomes).InvoiceId);
+        Assert.Equal(InvoiceStatus.SecondReminder, _invoices.Get("FAC-1").Status);
+        Assert.Equal(InvoiceStatus.FirstReminder, _invoices.Get("FAC-3").Status);
+        Assert.Equal(1, result.CustomersProcessed);
     }
 
     [Fact]
@@ -213,10 +249,29 @@ public sealed class ProcessRemindersUseCaseTests
 
         var result = await CreateSut().RunAsync(null, shutdown.Token);
 
-        Assert.True(result.Cancelled);
+        Assert.Equal(RunCompletion.Cancelled, result.Completion);
         Assert.Equal(InvoiceStatus.SecondReminder, _invoices.Get("FAC-1").Status);
         Assert.Equal(InvoiceStatus.FirstReminder, _invoices.Get("FAC-2").Status);
         Assert.False(_invoices.LastUpdateTokenCouldBeCancelled);
+        Assert.False(_sender.AnySendTokenCouldBeCancelled);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShutdownBeforeTheNextCustomer_ReturnsPartialResultWithoutReadingIt()
+    {
+        _customers.Add(Perez, Rodriguez);
+        _invoices.Add(
+            NewInvoice("FAC-1", Perez, InvoiceStatus.FirstReminder),
+            NewInvoice("FAC-2", Rodriguez, InvoiceStatus.FirstReminder));
+        using var shutdown = new CancellationTokenSource();
+        _sender.AfterSend = _ => shutdown.Cancel();
+
+        var result = await CreateSut().RunAsync(null, shutdown.Token);
+
+        Assert.Equal(RunCompletion.Cancelled, result.Completion);
+        Assert.Equal(1, result.CustomersProcessed);
+        Assert.Equal(OutcomeKind.SentAndUpdated, Assert.Single(result.Outcomes).Kind);
+        Assert.Equal(InvoiceStatus.FirstReminder, _invoices.Get("FAC-2").Status);
     }
 
     [Fact]

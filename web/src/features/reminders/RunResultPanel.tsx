@@ -7,7 +7,6 @@ const OUTCOME_LABELS: Record<OutcomeKind, { label: string; tone: 'ok' | 'warn' |
   UpdateConflict: { label: 'Conflicto: otro proceso la cambió', tone: 'warn' },
   UpdateFailedAfterSend: { label: 'Enviado, pero no actualizado', tone: 'error' },
   SkippedNoEmail: { label: 'Omitida: cliente sin correo', tone: 'muted' },
-  SkippedNotEligible: { label: 'Omitida: sin transición', tone: 'muted' },
 };
 
 interface RunResultPanelProps {
@@ -39,7 +38,8 @@ export function RunResultPanel({ result, mailpitUrl }: RunResultPanelProps) {
 
       <p className="muted">
         Ejecución <span className="mono">{result.runId}</span> · {result.customersProcessed} cliente(s) · duración {result.duration}
-        {result.cancelled && ' · interrumpida por apagado de la aplicación'}
+        {result.completion === 'Cancelled' && ' · interrumpida por apagado de la aplicación'}
+        {result.completion === 'StoppedPersistenceUnavailable' && ' · detenida: MongoDB no respondió, no se enviaron más correos'}
       </p>
 
       <dl className="counters">

@@ -11,35 +11,15 @@ internal static class MetaEndpoints
     {
         group.MapGet("/meta", GetMeta)
             .WithName("GetMeta")
-            .WithSummary("Datos de entorno que la interfaz necesita (sin secretos).");
+            .WithSummary("Lo que la interfaz necesita saber del entorno; sin datos de infraestructura.");
         return group;
     }
 
-    private static Ok<MetaDto> GetMeta(
-        IHostEnvironment environment,
-        IOptions<LinksOptions> links,
-        IOptions<SeedOptions> seed,
-        IOptions<SmtpOptions> smtp,
-        IOptions<MongoOptions> mongo)
+    private static Ok<MetaDto> GetMeta(IHostEnvironment environment, IOptions<LinksOptions> links, IOptions<SeedOptions> seed)
     {
         var version = typeof(MetaEndpoints).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
-
-        return TypedResults.Ok(new MetaDto(
-            version,
-            environment.EnvironmentName,
-            links.Value.MailpitUrl,
-            seed.Value.AllowReset,
-            smtp.Value.Host,
-            smtp.Value.Port,
-            mongo.Value.Database));
+        return TypedResults.Ok(new MetaDto(version, environment.EnvironmentName, links.Value.MailpitUrl, seed.Value.AllowReset));
     }
 
-    internal sealed record MetaDto(
-        string Version,
-        string Environment,
-        string? MailpitUrl,
-        bool AllowReset,
-        string SmtpHost,
-        int SmtpPort,
-        string MongoDatabase);
+    internal sealed record MetaDto(string Version, string Environment, string? MailpitUrl, bool AllowReset);
 }

@@ -12,6 +12,7 @@ public sealed class InMemoryInvoiceRepository(OperationJournal journal) : IInvoi
 {
     private readonly Dictionary<string, Invoice> _invoices = new(StringComparer.Ordinal);
     private readonly Dictionary<string, InvoiceStatus> _concurrentChanges = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Exception> _readFailures = new(StringComparer.Ordinal);
     private readonly List<StatusChange> _changes = [];
     private Exception? _updateFailure;
 
@@ -37,11 +38,20 @@ public sealed class InMemoryInvoiceRepository(OperationJournal journal) : IInvoi
     /// <summary>Hace que toda actualización lance la excepción indicada (p. ej. MongoDB caído).</summary>
     public void FailUpdatesWith(Exception exception) => _updateFailure = exception;
 
+    /// <summary>Hace que la lectura de las facturas de un cliente lance la excepción indicada.</summary>
+    public void FailReadsFor(string customerId, Exception exception) => _readFailures[customerId] = exception;
+
     public Task<IReadOnlyList<Invoice>> GetEligibleByCustomerAsync(
         string customerId,
         IReadOnlyCollection<InvoiceStatus> statuses,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_readFailures.TryGetValue(customerId, out var failure))
+        {
+            throw failure;
+        }
+
         IReadOnlyList<Invoice> eligible = _invoices.Values
             .Where(invoice => invoice.CustomerId == customerId && statuses.Contains(invoice.Status))
             .OrderBy(invoice => invoice.Id, StringComparer.Ordinal)
@@ -58,6 +68,7 @@ public sealed class InMemoryInvoiceRepository(OperationJournal journal) : IInvoi
     {
         journal.Record($"update:{invoiceId}");
         LastUpdateTokenCouldBeCancelled = cancellationToken.CanBeCanceled;
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (_updateFailure is not null)
         {

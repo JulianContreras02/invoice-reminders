@@ -15,20 +15,25 @@ public sealed class RecordingEmailSender(OperationJournal journal) : IEmailSende
     /// <summary>Se invoca después de cada envío aceptado.</summary>
     public Action<EmailMessage>? AfterSend { get; set; }
 
+    /// <summary>Si alguno de los envíos recibió un token cancelable (no debería: un envío no se interrumpe).</summary>
+    public bool AnySendTokenCouldBeCancelled { get; private set; }
+
     public void FailFor(string address) => _failingAddresses.Add(address);
 
-    public Task<EmailDispatchResult> SendAsync(EmailMessage message, CancellationToken cancellationToken)
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
+        cancellationToken.ThrowIfCancellationRequested();
+        AnySendTokenCouldBeCancelled |= cancellationToken.CanBeCanceled;
 
         if (_failingAddresses.Contains(message.ToAddress))
         {
-            throw new EmailDeliveryException($"SMTP no disponible para {message.ToAddress}.");
+            throw new EmailDeliveryException("SMTP no disponible.");
         }
 
         journal.Record($"send:{message.Headers["X-Invoice-Id"]}");
         _sent.Add(message);
         AfterSend?.Invoke(message);
-        return Task.FromResult(new EmailDispatchResult(message.MessageId));
+        return Task.CompletedTask;
     }
 }

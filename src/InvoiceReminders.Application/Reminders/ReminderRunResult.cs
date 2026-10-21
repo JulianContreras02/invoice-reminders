@@ -12,7 +12,7 @@ public sealed record ReminderRunResult(
     TimeSpan Duration,
     string? CustomerId,
     int CustomersProcessed,
-    bool Cancelled,
+    RunCompletion Completion,
     IReadOnlyList<InvoiceOutcome> Outcomes)
 {
     public int Candidates => Outcomes.Count;
@@ -27,12 +27,12 @@ public sealed record ReminderRunResult(
 
     public int EmailsSent => Updated + UpdateConflicts + UpdateFailedAfterSend;
 
-    public int Skipped => Count(OutcomeKind.SkippedNoEmail) + Count(OutcomeKind.SkippedNotEligible);
+    public int Skipped => Count(OutcomeKind.SkippedNoEmail);
 
     /// <summary>Fallos reales; los conflictos se reportan aparte como aviso.</summary>
     public int Failed => EmailFailed + UpdateFailedAfterSend;
 
-    public bool HasFailures => Failed > 0;
+    public bool HasFailures => Failed > 0 || Completion == RunCompletion.StoppedPersistenceUnavailable;
 
     private int Count(OutcomeKind kind) => Outcomes.Count(outcome => outcome.Kind == kind);
 }

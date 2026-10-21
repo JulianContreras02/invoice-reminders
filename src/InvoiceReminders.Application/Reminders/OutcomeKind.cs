@@ -15,9 +15,6 @@ public enum OutcomeKind
     /// <summary>El correo salió y la actualización falló; la siguiente ejecución lo reintentará.</summary>
     UpdateFailedAfterSend,
 
-    /// <summary>El cliente no tiene un correo válido; no se envía nada.</summary>
+    /// <summary>El cliente no tiene un correo entregable; no se envía nada.</summary>
     SkippedNoEmail,
-
-    /// <summary>Defensa en profundidad: el estado no tiene transición definida.</summary>
-    SkippedNotEligible,
 }
