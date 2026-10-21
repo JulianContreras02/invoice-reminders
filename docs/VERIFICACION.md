@@ -86,6 +86,10 @@ Pulse una vez más. Resultado: Candidatas 0 · Correos enviados 0 ("No había fa
 
 **Ejecución por cliente (opcional):** filtre por `cli-002` y pulse "Ejecutar solo para Rodríguez Abogados Ltda."; solo se procesan sus facturas. Equivale a `POST /api/reminders/run?customerId=cli-002` (parámetro de query string) desde `/scalar` o con `curl -X POST "http://localhost:8080/api/reminders/run?customerId=cli-002"`.
 
+### Verificación automática del guion
+
+El mismo recorrido de esta sección está automatizado en `.github/scripts/compose-smoke.sh`, que el CI ejecuta en cada push. Con el compose levantado, el revisor puede correrlo con `bash .github/scripts/compose-smoke.sh` (requiere `curl` y `jq`). Vacía Mailpit al empezar y deja los datos reiniciados al terminar.
+
 ## 6. Escenario "SMTP caído" (CA-08: sin correo no hay cambio de estado)
 
 Parta de los datos iniciales (sección 7 si ya ejecutó el guion anterior).

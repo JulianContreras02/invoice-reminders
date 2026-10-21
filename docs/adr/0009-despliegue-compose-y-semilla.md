@@ -19,7 +19,7 @@ Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API
 - **Opt-in:** `SeedOptions { Mode = Never, AllowReset = false }` por defecto; `Seed__Mode: IfEmpty` y `Seed__AllowReset: "true"` solo en compose y en `appsettings.Development.json`. `POST /api/admin/seed/reset` (modo `Always`: borra e inserta los mismos `_id`) responde 403 si `AllowReset=false`.
 - Variables de `app` en compose: `Mongo__ConnectionString: mongodb://mongo:27017`, `Mongo__Database: invoice_reminders`, `Smtp__Host: mailpit`, `Smtp__Port: "1025"`, `Smtp__Security: None`, `Smtp__FromAddress`, `Smtp__FromName`, `Links__MailpitUrl`.
 - No hay `docker-compose.vs.yml` ni `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose en Visual Studio queda como evolución; hoy se depura la API local con `docker compose up -d mongo mailpit`. Un `docker-compose.override.yml` generado por el asistente de Visual Studio está en `.gitignore`.
-- **CI opcional y todavía no incluido:** no existe `.github/workflows`. Si se añade, la propuesta es un workflow de GitHub Actions con jobs `backend` (compilar con `ContinuousIntegrationBuild=true`, `dotnet test`, `dotnet list` de dependencias), `frontend` (`npm run build`) y `compose-smoke` (`docker compose up -d --build --wait` y comprobar 10 facturas / 3 clientes / 7 → 4 → 0 correos). No añadiría pasos al revisor.
+- **CI en GitHub Actions** (`.github/workflows/ci.yml`) en cada push y pull request a `main`: `backend` compila con `ContinuousIntegrationBuild=true`, ejecuta `dotnet test` y comprueba con `dotnet list` que Application no depende de paquetes de infraestructura; `frontend` ejecuta `npm ci` y `npm run build`; `compose-smoke` hace `docker compose up -d --build --wait` y ejecuta `.github/scripts/compose-smoke.sh`, que comprueba salud, 10 facturas de 3 clientes, la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit, el reinicio de datos, el 404 de `/api/*`, la SPA y el documento OpenAPI. No añade pasos al revisor; el mismo script sirve en local con Docker.
 
 ## Alternativas consideradas
 
@@ -28,7 +28,7 @@ Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API
 - **Puertos en todas las interfaces.** Expondría un Mongo sin autenticación y un Mailpit a la red local de la máquina del revisor. Descartado; quien necesite acceso remoto lo cambia en su `.env`.
 - **Restaurar la `.slnx` dentro del Dockerfile.** Fallaría por el `.csproj` de `tests/`, excluido por `.dockerignore`. Descartado.
 - **Imágenes Alpine de .NET.** Rompen `es-CO` (ADR 0001).
-- **CI obligatorio en la entrega.** Demostraría el guion del revisor en máquina limpia en cada push, pero no cambia lo que el revisor ejecuta (`docker compose up --build`); se decidió que es opcional y no está incluido todavía.
+- **Sin CI.** Era la opción inicial por ser una capa opcional. Se incluyó porque el entorno de desarrollo no tenía Docker: el trabajo `compose-smoke` es la única verificación automática del despliegue real en una máquina limpia, sin añadir pasos al revisor.
 - **Carpeta `scripts/` con envoltorios.** "Un solo comando" no necesita seis scripts. Eliminada.
 
 ## Consecuencias
@@ -44,7 +44,7 @@ Negativas y lo que se acepta a cambio:
 
 - Primer build de 3-6 minutos; los siguientes tardan segundos. Se ensaya en un clon limpio sin .NET ni Node antes de entregar.
 - Mongo ≥ 5.0 exige AVX en x86-64: no se promete un tag alternativo; se documenta en el troubleshooting del README.
-- La compatibilidad MongoDB.Driver 3.12.0 con servidor 8.0 se verifica con la guía manual de `docs/VERIFICACION.md`, no con la matriz oficial ni con pruebas automatizadas (no hay pruebas de integración ni smoke de CI).
+- La compatibilidad MongoDB.Driver 3.12.0 con servidor 8.0 se verifica en cada push con el trabajo `compose-smoke` del CI (misma imagen `mongo:8.0` que usa el revisor) y con la guía manual de `docs/VERIFICACION.md`; no hay pruebas de integración con Testcontainers.
 - Imágenes con tag de versión menor (`sdk:10.0`, `aspnet:10.0`, `node:22-alpine`, `mongo:8.0`) para recibir parches; Mailpit fijado a `v1.31.6`.
 - Sin autenticación en la demo: decisión declarada como "solo demo local".
 

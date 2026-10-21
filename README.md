@@ -1,6 +1,7 @@
 <!--
 PENDIENTES ANTES DE ENTREGAR (quitar este bloque en el último commit):
-- Ensayar `docker compose up --build` en un equipo con Docker Desktop (aquí no se pudo: no hay Docker).
+- Subir el repositorio privado a GitHub y confirmar el CI en verde: el trabajo compose-smoke es la primera
+  ejecución real del docker compose (en el equipo de desarrollo no hay Docker).
 - Crear el tag `v1.0.0` y comprobar que este README describe exactamente lo que hay en ese tag.
 - Ensayar el inicio rápido en un clon limpio sin .NET ni Node antes de enviar.
 -->
@@ -116,6 +117,18 @@ El proyecto `tests/InvoiceReminders.UnitTests` usa `xunit.v3.mtp-off` 4.0.2, la 
 
 No hay pruebas de integración contra MongoDB/SMTP reales ni pruebas del frontend; el frontend se valida con `tsc` en modo estricto al compilar (`npm run build`). Ver [ADR 0008](docs/adr/0008-estrategia-de-pruebas.md).
 
+## Integración continua
+
+`.github/workflows/ci.yml` se ejecuta en cada push y pull request a `main` con tres trabajos: compilación y pruebas del backend con advertencias como errores, compilación del frontend, y una prueba de humo que levanta este mismo `docker compose` y recorre el guion de la guía de verificación (7, 4 y 0 correos). La prueba de humo también se puede correr en local con Docker, `curl` y `jq`:
+
+```bash
+docker compose up -d --build --wait
+```
+
+```bash
+bash .github/scripts/compose-smoke.sh
+```
+
 ## Abrir en Visual Studio 2026 y depurar
 
 Abra `InvoiceReminders.slnx` (formato XML de solución de Visual Studio 2026; carga de trabajo "ASP.NET y desarrollo web").
@@ -139,7 +152,8 @@ Peticiones de ejemplo listas para ejecutar en `src/InvoiceReminders.Api/InvoiceR
 ```
 invoice-reminders/
 ├─ InvoiceReminders.slnx · global.json · Directory.Build.props · Directory.Packages.props
-├─ docker-compose.yml · .env.example
+├─ docker-compose.yml · .env.example · nuget.config
+├─ .github/         workflows/ci.yml · scripts/compose-smoke.sh (prueba de humo del compose)
 ├─ docs/            ARQUITECTURA.md · DECISIONES.md · adr/0001…0010 · VERIFICACION.md · ENTREGA.md
 ├─ src/
 │  ├─ InvoiceReminders.Domain/          Customer, Invoice, InvoiceStatus, ReminderPolicy

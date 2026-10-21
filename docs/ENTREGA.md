@@ -101,7 +101,7 @@ Cada ADR (contexto, decisión, alternativas, consecuencias) está en `docs/adr/`
 | [0006](adr/0006-frontend-react-servido-desde-la-api.md) | React 19 + Vite 8 + TypeScript strict, compilado dentro de la imagen de la API | Angular; contenedor nginx aparte | Una pantalla no necesita módulos ni router; un contenedor, un origen, sin CORS |
 | [0007](adr/0007-mailkit-y-mailpit.md) | MailKit + Mailpit v1.31.6; sin emisor simulado; plantillas por interpolación con `HtmlEncode` | MailHog; `System.Net.Mail`; `LoggingEmailSender`; motor de plantillas | Mailpit mantenido (release semanal) con API REST; un emisor que simula éxito permitiría avanzar estados sin correo |
 | [0008](adr/0008-estrategia-de-pruebas.md) | Un proyecto de pruebas unitarias con `xunit.v3.mtp-off` 4.0.2 (xunit.v3 sin Microsoft Testing Platform) y `dotnet test` clásico (VSTest); dobles escritos a mano; sin Testcontainers; warnings como errores solo con `ContinuousIntegrationBuild=true` | xunit 2.9.3; NSubstitute; Microsoft.Testing.Platform; Testcontainers y suite de contrato | v2 deprecado en NuGet; proporcionalidad para una prueba técnica, menos dependencias y el doble del repositorio documenta el contrato del CAS |
-| [0009](adr/0009-despliegue-compose-y-semilla.md) | `docker compose` con app + mongo + mailpit, loopback, sin `restart`; semilla en la aplicación, opt-in; CI opcional, no incluido | Scripts `docker-entrypoint-initdb.d`; `restart: unless-stopped`; puertos abiertos | Mismo código de semilla en compose, F5, reinicio y pruebas; un error de configuración se ve en el log, no como bucle |
+| [0009](adr/0009-despliegue-compose-y-semilla.md) | `docker compose` con app + mongo + mailpit, loopback, sin `restart`; semilla en la aplicación, opt-in; CI en GitHub Actions con compilación estricta, pruebas, regla de dependencias y prueba de humo del compose | Scripts `docker-entrypoint-initdb.d`; `restart: unless-stopped`; puertos abiertos | Mismo código de semilla en compose, F5, reinicio y pruebas; un error de configuración se ve en el log, no como bucle |
 | [0010](adr/0010-repositorio-privado-y-confidencialidad.md) | Repositorio privado con invitación; nombre neutral; sin el texto de la prueba | Público | Confidencialidad pactada |
 
 ## 5. Calidad y pruebas
@@ -119,7 +119,7 @@ Es el `dotnet test` clásico (VSTest), gracias a `xunit.v3.mtp-off` (variante of
 
 Resultado: 42 casos (36 métodos) en verde en unos 2 s, sin Docker ni red; compilación Release con `-p:ContinuousIntegrationBuild=true` sin advertencias. Estándares: `Directory.Build.props` con `AnalysisLevel latest` y `EnforceCodeStyleInBuild`; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true`; `.editorconfig`; async de punta a punta con `CancellationToken`; sin `catch` vacíos.
 
-CI: no incluido (se decidió como opcional). Un workflow de GitHub Actions que compile con warnings como errores, ejecute las pruebas, verifique que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore` y haga un smoke de compose con la historia 7 → 4 → 0 queda en la sección 8.
+CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit. [PENDIENTE FASE 4: enlace a la primera ejecución en verde.]
 
 ## 6. Progreso
 
@@ -131,7 +131,7 @@ CI: no incluido (se decidió como opcional). Un workflow de GitHub Actions que c
 | 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION con capturas, este PDF, tag | [PENDIENTE FASE 4] |
 
 - Estado por requisito: [PENDIENTE FASE 4: tabla CA-01 … CA-17 con cumplido / parcial / no aplica].
-- Capas opcionales: ninguna de las cinco se incluyó (integración con Testcontainers, CI con smoke, `docker-compose.dcproj`, pruebas de componentes React, endpoint de detalle con historial); quedan en la sección 8.
+- Capas opcionales: se incluyó CI con prueba de humo del compose. No se incluyeron integración con Testcontainers, `docker-compose.dcproj`, pruebas de componentes React ni el endpoint de detalle con historial; quedan en la sección 8.
 - Problemas encontrados y cómo se resolvieron: [PENDIENTE FASE 4: lista breve; incluir al menos por qué las pruebas usan el `dotnet test` clásico (VSTest), el `nuget.config` explícito y la dependencia transitiva `System.Security.Cryptography.Pkcs` fijada a 10.0.13 por avisos de seguridad].
 
 ## 7. Guía de verificación
@@ -169,7 +169,7 @@ Ejecute otra vez: las mismas facturas se procesan y los correos aparecen en Mail
 
 ## 8. Pasos a seguir y evolución
 
-Piezas de ingeniería consideradas y no implementadas: pruebas de integración con Testcontainers contra MongoDB real (con una suite de contrato compartida por el repositorio en memoria y el de Mongo), workflow de CI con smoke de compose, `docker-compose.dcproj` para depurar con F5 dentro de Docker Compose en Visual Studio, pruebas de componentes React (Vitest + Testing Library) y ESLint y el detalle de factura con historial (`GET /api/invoices/{id}`).
+Piezas de ingeniería consideradas y no implementadas: pruebas de integración con Testcontainers contra MongoDB real (con una suite de contrato compartida por el repositorio en memoria y el de Mongo), `docker-compose.dcproj` para depurar con F5 dentro de Docker Compose en Visual Studio, pruebas de componentes React (Vitest + Testing Library) y ESLint y el detalle de factura con historial (`GET /api/invoices/{id}`).
 
 Extensiones naturales del mismo caso de uso, no incluidas a propósito: job programado (`BackgroundService` deshabilitado por defecto), consolidación de correos por cliente, ventanas de tiempo entre recordatorios, outbox o colección de auditoría de envíos (haría el duplicado detectable antes, no imposible), lease distribuido en Mongo con TTL para varias instancias, autenticación y autorización, paginación y observabilidad con OpenTelemetry.
 

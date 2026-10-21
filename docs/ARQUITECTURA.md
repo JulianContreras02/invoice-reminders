@@ -61,7 +61,7 @@ flowchart LR
 
 ## 3. Capas y regla de dependencias
 
-Todas las flechas apuntan al dominio. La regla se hace cumplir con las referencias de los `.csproj` (revisables a simple vista) y se comprueba con un comando barato: `dotnet list src/InvoiceReminders.Application package --include-transitive` no debe contener `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore` (hoy es una verificación manual; no hay workflow de CI que la ejecute). No hay prueba por reflexión: `GetReferencedAssemblies()` solo ve ensamblados usados en IL y daría una falsa sensación de garantía.
+Todas las flechas apuntan al dominio. La regla se hace cumplir con las referencias de los `.csproj` (revisables a simple vista) y se comprueba con un comando barato: `dotnet list src/InvoiceReminders.Application package --include-transitive` no debe contener `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore` (el workflow de CI lo ejecuta en cada push). No hay prueba por reflexión: `GetReferencedAssemblies()` solo ve ensamblados usados en IL y daría una falsa sensación de garantía.
 
 | Proyecto | Referencia a | Paquetes permitidos | Contiene |
 |---|---|---|---|
@@ -401,5 +401,5 @@ El índice de decisiones está en [DECISIONES.md](DECISIONES.md); cada ADR (una 
 | 0006 | React 19 + Vite 8 + TypeScript strict, compilado dentro de la imagen de la API (`wwwroot`), sin CORS |
 | 0007 | MailKit + Mailpit v1.31.6; sin `LoggingEmailSender`; plantillas por interpolación con `HtmlEncode` |
 | 0008 | Un proyecto de pruebas unitarias: `xunit.v3.mtp-off` 4.0.2 (xunit.v3 sin Microsoft Testing Platform) con `dotnet test` clásico (VSTest); dobles escritos a mano (sin NSubstitute); sin Testcontainers; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true` |
-| 0009 | `docker compose` con app + mongo + mailpit, puertos en loopback, sin `restart`; semilla en la aplicación, opt-in; CI opcional, no incluido |
+| 0009 | `docker compose` con app + mongo + mailpit, puertos en loopback, sin `restart`; semilla en la aplicación, opt-in; CI en GitHub Actions con compilación estricta, pruebas, regla de dependencias y prueba de humo del compose |
 | 0010 | Repositorio privado con invitación al equipo revisor; nombre neutral; sin el enunciado literal |

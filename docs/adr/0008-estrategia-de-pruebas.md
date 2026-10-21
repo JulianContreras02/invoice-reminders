@@ -58,4 +58,4 @@ Negativas y lo que se acepta a cambio:
 
 - `docs/ARQUITECTURA.md`: tabla DI, capas y sección 13.1 (evolución).
 - `README.md`: comandos de prueba.
-- ADR 0001 (SDK 10), ADR 0004 (contrato del CAS) y ADR 0009 (CI opcional, no incluido).
+- ADR 0001 (SDK 10), ADR 0004 (contrato del CAS) y ADR 0009 (CI con prueba de humo del compose).
