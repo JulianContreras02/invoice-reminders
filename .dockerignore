@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/.vs
+**/node_modules
+**/*.user
+web/dist
+src/InvoiceReminders.Api/wwwroot
+.git
+.github
+docs
+tests
+*.md
+.env

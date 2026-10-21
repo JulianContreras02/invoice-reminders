@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adaptadores: MongoDB, SMTP (MailKit), semilla de datos de demostración y chequeos de salud. -->
+  <PropertyGroup>
+    <RootNamespace>InvoiceReminders.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\InvoiceReminders.Application\InvoiceReminders.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="InvoiceReminders.UnitTests" />
+  </ItemGroup>
+</Project>

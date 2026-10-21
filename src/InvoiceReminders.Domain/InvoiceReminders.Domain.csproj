@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Núcleo del negocio: sin referencias a otros proyectos ni paquetes externos. -->
+  <PropertyGroup>
+    <RootNamespace>InvoiceReminders.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

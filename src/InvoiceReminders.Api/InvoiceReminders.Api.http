@@ -1,0 +1,24 @@
+# Peticiones listas para Visual Studio (botón "Enviar solicitud").
+# Con docker compose la API está en el puerto 8080; con F5 (perfil http) en el 5080.
+@baseUrl = http://localhost:5080
+
+### Resumen de todas las facturas
+GET {{baseUrl}}/api/invoices
+
+### Facturas de un cliente en un estado
+GET {{baseUrl}}/api/invoices?customerId=cli-002&status=primerrecordatorio
+
+### Ejecutar el proceso para todos los clientes
+POST {{baseUrl}}/api/reminders/run
+
+### Ejecutar el proceso solo para un cliente
+POST {{baseUrl}}/api/reminders/run?customerId=cli-003
+
+### Reiniciar los datos de demostración (requiere Seed__AllowReset=true)
+POST {{baseUrl}}/api/admin/seed/reset
+
+### Datos de entorno para la interfaz
+GET {{baseUrl}}/api/meta
+
+### Salud: MongoDB y SMTP
+GET {{baseUrl}}/health/ready

@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# .NET
+# ---------------------------------------------------------------------------
+# Salidas de compilación
+**/bin/
+**/obj/
+# Carpeta de trabajo de Visual Studio
+.vs/
+# Configuración local de usuario de Visual Studio
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+# Resultados de pruebas (dotnet test, Test Explorer, reporter TRX de xunit.v3)
+TestResults/
+**/TestResults/
+*.trx
+# Artefactos de publicación locales
+publish/
+*.nupkg
+*.snupkg
+
+# ---------------------------------------------------------------------------
+# Node / Vite (frontend en web/)
+# ---------------------------------------------------------------------------
+# Dependencias instaladas por npm
+node_modules/
+# Salida de `npm run build`
+web/dist/
+# Caché de Vite y de Vitest
+web/.vite/
+web/coverage/
+# Registros de npm y similares
+*.log
+npm-debug.log*
+
+# Build del frontend copiado a la API (se genera en la etapa `web` del Dockerfile;
+# nunca se versiona: el revisor no necesita Node y el contenido se regenera en cada build)
+src/InvoiceReminders.Api/wwwroot/
+
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
+# Configuración local de puertos del host; la plantilla .env.example SÍ se versiona
+.env
+!.env.example
+# Archivo que genera el asistente de Docker Compose de Visual Studio; se elimina
+# a mano y lo que Visual Studio necesita vive en docker-compose.vs.yml
+docker-compose.override.yml
+
+# ---------------------------------------------------------------------------
+# Sistema operativo y editores
+# ---------------------------------------------------------------------------
+Thumbs.db
+.DS_Store
+*.swp
+
+# ---------------------------------------------------------------------------
+# Material interno de planeación
+# ---------------------------------------------------------------------------
+# Borrador de arquitectura con razonamiento, niveles de confianza y notas de revisión.
+# Es material de trabajo del candidato y hace referencia al contexto confidencial de la
+# evaluación; no forma parte de la entrega. La fuente de verdad publicada es docs/.
+docs/planeacion/

@@ -1,0 +1,22 @@
+<Project>
+  <!-- Configuración común a todos los proyectos .NET de la solución. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Los warnings solo son errores al compilar con -p:ContinuousIntegrationBuild=true (pensado para un pipeline de CI).
+    Así un aviso de seguridad de NuGet publicado después de la entrega no rompe
+    el despliegue con docker compose del equipo revisor (ADR 0008).
+  -->
+  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+</Project>

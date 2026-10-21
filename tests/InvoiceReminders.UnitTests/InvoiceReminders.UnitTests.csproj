@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pruebas unitarias: sin Docker, sin red, sin MongoDB ni SMTP.
+    xunit.v3 se ejecuta con el "dotnet test" clásico (VSTest) y con el Explorador de pruebas
+    de Visual Studio gracias a xunit.runner.visualstudio (ADR 0008).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>InvoiceReminders.UnitTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-off" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InvoiceReminders.Domain\InvoiceReminders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\InvoiceReminders.Application\InvoiceReminders.Application.csproj" />
+    <!-- Solo para DemoDataTests y DependencyInjectionTests: validan la semilla real y el grafo real de dependencias. -->
+    <ProjectReference Include="..\..\src\InvoiceReminders.Infrastructure\InvoiceReminders.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Composición, endpoints HTTP y archivos estáticos del frontend (wwwroot, generado en Docker). -->
+  <PropertyGroup>
+    <RootNamespace>InvoiceReminders.Api</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\InvoiceReminders.Application\InvoiceReminders.Application.csproj" />
+    <ProjectReference Include="..\InvoiceReminders.Infrastructure\InvoiceReminders.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+</Project>

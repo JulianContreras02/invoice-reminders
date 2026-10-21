@@ -1,0 +1,61 @@
+# Un solo comando levanta todo: docker compose up --build
+#   UI y API:  http://localhost:8080   (documentación de la API en /scalar)
+#   Correos:   http://localhost:8025   (Mailpit)
+# Los puertos se publican solo en 127.0.0.1: MongoDB y Mailpit no tienen autenticación en esta demo.
+name: invoice-reminders
+
+services:
+  mongo:
+    image: mongo:8.0
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+      - "127.0.0.1:${SMTP_PORT:-1025}:1025"
+
+  app:
+    build:
+      context: .
+      dockerfile: src/InvoiceReminders.Api/Dockerfile
+    image: invoice-reminders-app:local
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    environment:
+      Mongo__ConnectionString: mongodb://mongo:27017
+      Mongo__Database: invoice_reminders
+      Smtp__Host: mailpit
+      Smtp__Port: "1025"
+      Smtp__Security: None
+      Smtp__FromAddress: recordatorios@invoice-reminders.test
+      Smtp__FromName: Recordatorios de facturación
+      Seed__Mode: IfEmpty
+      Seed__AllowReset: "true"
+      Links__MailpitUrl: http://localhost:${MAILPIT_PORT:-8025}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy   # la imagen de Mailpit declara HEALTHCHECK (/mailpit readyz)
+    healthcheck:
+      # La imagen de ASP.NET no trae curl; bash puede abrir un socket TCP sin instalar nada.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    # Sin "restart": si la configuración es inválida el contenedor termina y
+    # "docker compose logs app" muestra la causa en lugar de un bucle de reinicios.
+
+volumes:
+  mongo_data:
