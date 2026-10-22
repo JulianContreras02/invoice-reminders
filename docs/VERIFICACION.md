@@ -2,7 +2,7 @@
 
 **Proyecto:** `invoice-reminders` · **Fecha:** 2026-10-21 · Primer build: 3-6 minutos; el resto del guion no requiere esperas.
 
-Esta guía recorre, paso a paso y con resultados esperados, todo lo que el sistema promete. La arquitectura está en [ARQUITECTURA.md](ARQUITECTURA.md); las decisiones en [DECISIONES.md](DECISIONES.md). Los lugares marcados `[CAPTURA: …]` llevarán capturas de pantalla en la versión final.
+Esta guía recorre, paso a paso y con resultados esperados, todo lo que el sistema promete. La arquitectura está en [ARQUITECTURA.md](ARQUITECTURA.md); las decisiones en [DECISIONES.md](DECISIONES.md). Las capturas de `img/` se tomaron con la versión entregada, contra MongoDB 8.0.34 y Mailpit 1.31.6 reales.
 
 ---
 
@@ -31,6 +31,8 @@ Para apagar: `Ctrl+C` y `docker compose down`. Para borrar también los datos: `
 | Salud (JSON por check) | `http://localhost:8080/health/ready` |
 | Correos capturados (Mailpit) | `http://localhost:8025` |
 
+![Documentación interactiva de la API en /scalar](img/06-api-scalar.png)
+
 Si algún puerto está ocupado, vea la sección 11.
 
 ## 4. Qué debe ver al abrir la UI
@@ -43,7 +45,7 @@ Abra `http://localhost:8080`. Pantalla única "Resumen de facturas":
 - Tabla con **10 facturas** (`FAC-2026-0101` … `FAC-2026-0304`) con número de factura, cliente, correo, monto en COP, emisión, vencimiento, estado y fecha de actualización.
 - Filtros por cliente y por estado; botones "Ejecutar recordatorios (todos)" y "Reiniciar datos de demostración".
 
-`[CAPTURA: UI inicial con tarjetas 4/3/1/2, resumen de los tres clientes y las 10 facturas]`
+![Interfaz inicial: tarjetas 4/3/1/2, resumen de los tres clientes y las 10 facturas](img/01-resumen-inicial.png)
 
 Mailpit (`http://localhost:8025`) debe estar vacío.
 
@@ -67,7 +69,11 @@ En Mailpit: **7 correos**, **3 destinatarios** y **2 asuntos** distintos:
 
 Abra el correo de `FAC-2026-0102`: el nombre `Pérez & Asociados S.A.S.` se muestra correctamente en la vista HTML, y en las cabeceras aparecen `X-Invoice-Id`, `X-Reminder-Kind`, `X-Reminder-Run-Id` y un `Message-ID` con la forma `<FAC-2026-0102.segundorecordatorio.{runId sin guiones}@invoice-reminders.test>` (en `historialEstados[].mensajeId` y en la respuesta de la API el mismo valor se guarda sin los corchetes angulares).
 
-`[CAPTURA: panel de resultado de la ejecución 1]` · `[CAPTURA: Mailpit con 7 mensajes y los dos asuntos]`
+![Resultado de la ejecución 1: 7 enviados y 7 actualizadas, con el antes y el después de cada factura](img/02-resultado-ejecucion-1.png)
+
+![Mailpit con los 7 correos y los dos asuntos](img/03-mailpit-bandeja.png)
+
+![Detalle del correo de FAC-2026-0101 en Mailpit](img/04-mailpit-correo.png)
 
 ### Ejecución 2
 
@@ -100,7 +106,7 @@ Parta de los datos iniciales (sección 7 si ya ejecutó el guion anterior).
 4. `docker compose start mailpit`. El chip vuelve a verde.
 5. Pulse de nuevo: 7 enviados y 7 actualizadas; Mailpit recibe los 7 correos.
 
-`[CAPTURA: chip "SMTP no disponible" y panel con 7 EmailFailed y tarjetas intactas]`
+![SMTP caído: indicador rojo, 7 correos fallidos y tarjetas 4/3/1/2 intactas](img/05-smtp-caido.png)
 
 ## 7. Repetir la demo
 
@@ -121,7 +127,25 @@ Esperado: 62 casos de prueba en verde (48 métodos `[Fact]`/`[Theory]`; los cinc
 
 No hay pruebas de integración ni pruebas del frontend; el frontend se valida con la compilación estricta de TypeScript (`npm run build` = `tsc && vite build`, que se ejecuta dentro del build de Docker).
 
-`[CAPTURA: salida de dotnet test en verde]`
+Salida real con el SDK 10.0.402:
+
+```
+Pruebas totales: 62
+     Correcto: 62
+ Tiempo total: 3,2946 Segundos
+```
+
+| Clase de prueba | Métodos |
+|---|---|
+| `Application.ProcessRemindersUseCaseTests` | 17 |
+| `Application.ReminderEmailComposerTests` | 7 |
+| `Composition.DemoDataTests` | 5 |
+| `Composition.DependencyInjectionTests` | 4 |
+| `Domain.CustomerTests` | 2 |
+| `Domain.InvoiceStatusTests` | 3 |
+| `Domain.ReminderPolicyTests` | 3 |
+| `Infrastructure.DocumentMappersTests` | 3 |
+| `Infrastructure.MailKitEmailSenderTests` | 4 |
 
 ## 9. Cómo abrir en Visual Studio 2026
 
@@ -134,29 +158,29 @@ Versión: Visual Studio 2026 (18.x) Community, carga de trabajo "ASP.NET y desar
 
 No hay proyecto `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose queda como evolución posible.
 
-`[CAPTURA: Test Explorer en verde]`
+En el Explorador de pruebas (*Prueba > Explorador de pruebas > Ejecutar todas*) aparecen las mismas 62 pruebas agrupadas por proyecto, espacio de nombres y clase.
 
 ## 10. Checklist de criterios de aceptación
 
 | | Criterio | Cómo se verifica |
 |---|---|---|
-| [ ] | **CA-01** Conexión | La API arranca y la UI muestra facturas. Negativo: arranque la API local desde Visual Studio sin `docker compose up -d mongo mailpit`: el log muestra "Esperando MongoDB (intento i/15): …" y el proceso termina con código 1 y un error explícito; `docker compose logs app` nunca muestra un bucle de reinicio. |
-| [ ] | **CA-02** Extracción por cliente | Filtro de cliente `cli-002` (o `GET /api/invoices?customerId=cli-002`): exactamente sus 3 facturas. "Ejecutar solo para {cliente}" procesa únicamente las suyas. |
-| [ ] | **CA-03** Filtro por estado | Tras cualquier ejecución, `0103` y `0303` (`pagada`) y `0203` (`desactivado`) no tienen correo en Mailpit ni cambio de estado. |
-| [ ] | **CA-04** Correo de primer recordatorio | Ejecución 1: 4 correos con asunto `Factura {numero}: ha pasado a segundo recordatorio`, cada uno al email del cliente dueño. |
-| [ ] | **CA-05** Correo de segundo recordatorio | Ejecución 1: 3 correos con asunto `Factura {numero}: aviso de desactivación del servicio`. |
-| [ ] | **CA-06** Transición 1→2 | `FAC-2026-0101` pasa a `segundorecordatorio` tras la ejecución 1 (UI, o en Mongo: `docker compose exec mongo mongosh invoice_reminders --quiet --eval "db.facturas.find({}, {estado: 1})"`). |
-| [ ] | **CA-07** Transición 2→desactivado | `FAC-2026-0102` pasa a `desactivado` tras la ejecución 1; `historialEstados` tiene una entrada nueva con `motivo: "recordatorio"`, `ejecucionId` y `mensajeId`. |
-| [ ] | **CA-08** Orden correo → actualización | Sección 6: con Mailpit detenido, 7 `EmailFailed` y tarjetas 4/3/1/2 intactas; un fallo de correo no interrumpe el lote (solo un fallo de MongoDB lo detiene). |
-| [ ] | **CA-09** Estados no contemplados intactos | Tras las tres ejecuciones, la tarjeta "Pagadas" sigue en 2 y `0203` sigue siendo la única `desactivado` sin correo. |
-| [ ] | **CA-10** Un paso por ejecución | `0101`: `primerrecordatorio` → `segundorecordatorio` (ejecución 1) → `desactivado` (ejecución 2); nunca dos saltos en una ejecución. |
-| [ ] | **CA-11** Tres clientes | Mailpit: 3 destinatarios distintos; cada correo nombra en el asunto una factura del cliente destinatario (tabla de la sección 5). Resumen por cliente en la UI. |
-| [ ] | **CA-12** Resumen en UI | Tabla con las 10 facturas (cliente, número, estado), tarjetas por estado y resumen de los 3 clientes con nombre, email y conteos; se actualiza tras cada ejecución. |
-| [ ] | **CA-13** Datos reproducibles | En un clon limpio, `docker compose up --build` deja 3 clientes y 10 facturas sin intervención manual; `GET /api/invoices` devuelve `total: 10` y 3 `customers`. |
-| [ ] | **CA-14** Stack exigido | `InvoiceReminders.slnx` compila y depura en Visual Studio 2026 con .NET 10 y C#; `web/` es React (Vite + TypeScript) y consume `/api`. |
-| [ ] | **CA-15** Inyección de dependencias | `Application/DependencyInjection.cs` e `Infrastructure/DependencyInjection.cs`; el caso de uso recibe `ICustomerRepository`, `IInvoiceRepository`, `IReminderEmailComposer`, `IEmailSender` por constructor; `ProcessRemindersUseCaseTests` lo construye con dobles; `DependencyInjectionTests` valida el grafo real. |
-| [ ] | **CA-16** Pruebas unitarias | `dotnet test` en verde sin Mongo ni SMTP (62 casos); cubre ambas transiciones, selección de plantilla, exclusión de estados, no actualización si falla el envío, tres clientes sin cruces e invariantes de contadores. |
-| [ ] | **CA-17** Documentación y entrega | `README.md` operativo; `docs/ARQUITECTURA.md`, `docs/DECISIONES.md` + ADR, esta guía y `docs/ENTREGA.md`; el repositorio no reproduce el enunciado de la prueba técnica. |
+| [x] | **CA-01** Conexión | La API arranca y la UI muestra facturas. Negativo: arranque la API local desde Visual Studio sin `docker compose up -d mongo mailpit`: el log muestra "Esperando MongoDB (intento i/15): …" y el proceso termina con código 1 y un error explícito; `docker compose logs app` nunca muestra un bucle de reinicio. |
+| [x] | **CA-02** Extracción por cliente | Filtro de cliente `cli-002` (o `GET /api/invoices?customerId=cli-002`): exactamente sus 3 facturas. "Ejecutar solo para {cliente}" procesa únicamente las suyas. |
+| [x] | **CA-03** Filtro por estado | Tras cualquier ejecución, `0103` y `0303` (`pagada`) y `0203` (`desactivado`) no tienen correo en Mailpit ni cambio de estado. |
+| [x] | **CA-04** Correo de primer recordatorio | Ejecución 1: 4 correos con asunto `Factura {numero}: ha pasado a segundo recordatorio`, cada uno al email del cliente dueño. |
+| [x] | **CA-05** Correo de segundo recordatorio | Ejecución 1: 3 correos con asunto `Factura {numero}: aviso de desactivación del servicio`. |
+| [x] | **CA-06** Transición 1→2 | `FAC-2026-0101` pasa a `segundorecordatorio` tras la ejecución 1 (UI, o en Mongo: `docker compose exec mongo mongosh invoice_reminders --quiet --eval "db.facturas.find({}, {estado: 1})"`). |
+| [x] | **CA-07** Transición 2→desactivado | `FAC-2026-0102` pasa a `desactivado` tras la ejecución 1; `historialEstados` tiene una entrada nueva con `motivo: "recordatorio"`, `ejecucionId` y `mensajeId`. |
+| [x] | **CA-08** Orden correo → actualización | Sección 6: con Mailpit detenido, 7 `EmailFailed` y tarjetas 4/3/1/2 intactas; un fallo de correo no interrumpe el lote (solo un fallo de MongoDB lo detiene). |
+| [x] | **CA-09** Estados no contemplados intactos | Tras las tres ejecuciones, la tarjeta "Pagadas" sigue en 2 y `0203` sigue siendo la única `desactivado` sin correo. |
+| [x] | **CA-10** Un paso por ejecución | `0101`: `primerrecordatorio` → `segundorecordatorio` (ejecución 1) → `desactivado` (ejecución 2); nunca dos saltos en una ejecución. |
+| [x] | **CA-11** Tres clientes | Mailpit: 3 destinatarios distintos; cada correo nombra en el asunto una factura del cliente destinatario (tabla de la sección 5). Resumen por cliente en la UI. |
+| [x] | **CA-12** Resumen en UI | Tabla con las 10 facturas (cliente, número, estado), tarjetas por estado y resumen de los 3 clientes con nombre, email y conteos; se actualiza tras cada ejecución. |
+| [x] | **CA-13** Datos reproducibles | En un clon limpio, `docker compose up --build` deja 3 clientes y 10 facturas sin intervención manual; `GET /api/invoices` devuelve `total: 10` y 3 `customers`. |
+| [ ] | **CA-14** Stack exigido | `InvoiceReminders.slnx` compila y depura en Visual Studio 2026 con .NET 10 y C#; `web/` es React (Vite + TypeScript) y consume `/api`. Compila y se prueba con el SDK 10.0.402 desde la línea de comandos y en el CI; falta abrirla en Visual Studio 2026. |
+| [x] | **CA-15** Inyección de dependencias | `Application/DependencyInjection.cs` e `Infrastructure/DependencyInjection.cs`; el caso de uso recibe `ICustomerRepository`, `IInvoiceRepository`, `IReminderEmailComposer`, `IEmailSender` por constructor; `ProcessRemindersUseCaseTests` lo construye con dobles; `DependencyInjectionTests` valida el grafo real. |
+| [x] | **CA-16** Pruebas unitarias | `dotnet test` en verde sin Mongo ni SMTP (62 casos); cubre ambas transiciones, selección de plantilla, exclusión de estados, no actualización si falla el envío, tres clientes sin cruces e invariantes de contadores. |
+| [x] | **CA-17** Documentación y entrega | `README.md` operativo; `docs/ARQUITECTURA.md`, `docs/DECISIONES.md` + ADR, esta guía y `docs/ENTREGA.md`; el repositorio no reproduce el enunciado de la prueba técnica. |
 
 ## 11. Troubleshooting
 

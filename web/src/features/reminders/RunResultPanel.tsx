@@ -1,4 +1,5 @@
 import type { OutcomeKind, ReminderRunResult } from '../../api/types';
+import { formatDuration } from '../invoices/format';
 import { StatusBadge } from '../invoices/StatusBadge';
 
 const OUTCOME_LABELS: Record<OutcomeKind, { label: string; tone: 'ok' | 'warn' | 'error' | 'muted' }> = {
@@ -37,7 +38,7 @@ export function RunResultPanel({ result, mailpitUrl }: RunResultPanelProps) {
       </div>
 
       <p className="muted">
-        Ejecución <span className="mono">{result.runId}</span> · {result.customersProcessed} cliente(s) · duración {result.duration}
+        Ejecución <span className="mono">{result.runId}</span> · {result.customersProcessed} cliente(s) · duración {formatDuration(result.duration)}
         {result.completion === 'Cancelled' && ' · interrumpida por apagado de la aplicación'}
         {result.completion === 'StoppedPersistenceUnavailable' && ' · detenida: MongoDB no respondió, no se enviaron más correos'}
       </p>

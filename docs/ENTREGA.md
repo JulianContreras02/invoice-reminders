@@ -1,11 +1,7 @@
 <!--
-EXPORTACIÓN A PDF (fase 4; se ensaya en la fase 1 con este borrador para no improvisarla al final):
-- Opción A: VS Code con la extensión "Markdown PDF" sobre docs/ENTREGA.md.
-- Opción B: pandoc docs/ENTREGA.md -o ENTREGA.pdf --pdf-engine=wkhtmltopdf
-- Los diagramas Mermaid NO se renderizan de forma fiable en los exportadores: se exportan como PNG desde
-  mermaid.live (fuente: docs/ARQUITECTURA.md) y se guardan en docs/img/ con los nombres referenciados abajo.
-- Objetivo: 6-10 páginas. Antes de exportar no debe quedar ningún marcador [PENDIENTE ...], ninguna afirmación
-  sin respaldo en el código del tag evaluado, ningún nivel de confianza ni texto del enunciado.
+EXPORTACIÓN A PDF: el PDF se genera desde este archivo renderizándolo en Microsoft Edge sin ventana
+(Markdown con marked y diagramas desde docs/img/), con Page.printToPDF. Antes de exportar no debe quedar
+ningún marcador PENDIENTE, ninguna afirmación sin respaldo en el código del tag evaluado ni texto del enunciado.
 -->
 
 # Proceso de recordatorios de cobro sobre facturas — Documento de entrega
@@ -14,12 +10,12 @@ EXPORTACIÓN A PDF (fase 4; se ensaya en la fase 1 con este borrador para no imp
 
 | | |
 |---|---|
-| Autor | [PENDIENTE FASE 4: nombre del candidato] |
-| Fecha de entrega | [PENDIENTE FASE 4: fecha] |
+| Autor | Julian Contreras |
+| Fecha de entrega | 21 de octubre de 2026 |
 | Repositorio | https://github.com/JulianContreras02/invoice-reminders (público) |
-| Tag evaluado | `v1.0.0` [PENDIENTE FASE 4: confirmar el tag creado] |
+| Tag evaluado | `v1.0.0` |
 | Versiones | .NET 10 (LTS) · Node 22 (solo para desarrollo del frontend) · Docker Desktop · MongoDB 8.0 · Mailpit v1.31.6 |
-| Tiempo de lectura | [PENDIENTE FASE 4: estimar tras exportar] |
+| Tiempo de lectura | Unos 20 minutos; 8 si solo se leen las secciones 1, 3 y 7 |
 
 Este documento es narrativo: qué se construyó, por qué, cómo se verificó y qué sigue. El detalle operativo (comandos, variables, troubleshooting) está en el `README.md` del repositorio; aquí solo se incluye el camino feliz de tres pasos.
 
@@ -128,9 +124,9 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 | 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
 | 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
 | 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo local con MongoDB 8.0.34 y Mailpit 1.31.6 reales: historia 7 → 4 → 0, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
-| 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION, este documento | En curso: [PENDIENTE FASE 4: capturas, PDF y tag `v1.0.0`] |
+| 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION con capturas reales, este documento en PDF, tag `v1.0.0` | Completa |
 
-- Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. Los de lógica (CA-02 a CA-11, CA-15, CA-16) están cubiertos por pruebas unitarias; los de despliegue e interfaz (CA-01, CA-12, CA-13) los ejecuta el trabajo `compose-smoke` del CI. [PENDIENTE FASE 4: marcar cada uno tras la primera ejecución en verde y el ensayo manual con capturas.]
+- Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. 16 de 17 están verificados: los de lógica (CA-02 a CA-11, CA-15, CA-16) con pruebas unitarias y con el ensayo contra MongoDB y Mailpit reales; los de despliegue e interfaz (CA-01, CA-12, CA-13) con el trabajo `compose-smoke` del CI y las capturas; CA-01 también en su camino negativo (sin MongoDB, 15 reintentos y salida con código 1 en unos 105 s). CA-14 compila y se prueba con el SDK 10.0.402 y en el CI; abrir la solución en Visual Studio 2026 es la verificación que falta.
 - Capas opcionales: se incluyó CI con prueba de humo del compose. No se incluyeron integración con Testcontainers, `docker-compose.dcproj`, pruebas de componentes React ni el endpoint de detalle con historial; quedan en la sección 8.
 - Problemas encontrados y cómo se resolvieron:
   - **Runner de pruebas.** xunit.v3 4.0 usa Microsoft Testing Platform por defecto, y con el SDK 10 eso cambia la sintaxis de `dotnet test` y su integración con VSTest. Se eligió `xunit.v3.mtp-off`, la variante oficial que deja el `dotnet test` clásico y el Explorador de pruebas sin configuración extra.
@@ -217,7 +213,21 @@ Para un SMTP real solo cambian variables: `Smtp__Port=587` + `Smtp__Security=Sta
 
 ### D. Capturas
 
-[PENDIENTE FASE 4: UI antes y después con resumen por cliente; Mailpit con 7 mensajes y dos asuntos; panel de resultado con `EmailFailed` durante el escenario de SMTP caído; Explorador de pruebas en verde. Archivos en `docs/img/`.]
+Tomadas con la versión entregada, contra MongoDB 8.0.34 y Mailpit 1.31.6 reales.
+
+![Interfaz inicial: 4 / 3 / 1 / 2 y los tres clientes](img/01-resumen-inicial.png)
+
+![Tras la primera ejecución: 7 correos enviados y 7 facturas actualizadas](img/02-resultado-ejecucion-1.png)
+
+![Mailpit con los 7 correos y los dos asuntos](img/03-mailpit-bandeja.png)
+
+![Correo de la factura FAC-2026-0101](img/04-mailpit-correo.png)
+
+![SMTP caído: 7 correos fallidos y estados intactos](img/05-smtp-caido.png)
+
+![Documentación interactiva de la API](img/06-api-scalar.png)
+
+Pruebas unitarias con el SDK 10.0.402: 62 de 62 en verde en unos 3 s.
 
 ### E. Plantillas de correo
 

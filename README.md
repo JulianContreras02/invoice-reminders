@@ -5,6 +5,12 @@
 Proceso de recordatorios de cobro sobre facturas almacenadas en MongoDB: por cada factura en primer o segundo recordatorio envía un correo al cliente y, solo si el envío fue aceptado, avanza su estado al siguiente escalón (segundo recordatorio o desactivado).
 Incluye una API Minimal (.NET 10), una interfaz React de una pantalla con el resumen de todas las facturas y un `docker compose` con la aplicación, MongoDB y un capturador de correo (Mailpit).
 
+[![CI](https://github.com/JulianContreras02/invoice-reminders/actions/workflows/ci.yml/badge.svg)](https://github.com/JulianContreras02/invoice-reminders/actions/workflows/ci.yml)
+
+![Resumen de facturas tras la primera ejecución: 7 correos enviados y 7 facturas actualizadas](docs/img/02-resultado-ejecucion-1.png)
+
+Más capturas en la [guía de verificación](docs/VERIFICACION.md). El documento de entrega está en [docs/ENTREGA.md](docs/ENTREGA.md) y en [PDF](docs/ENTREGA.pdf).
+
 ## Requisito previo
 
 - **Docker Desktop** (con WSL2 en Windows). Es el único requisito para desplegar y verificar.
