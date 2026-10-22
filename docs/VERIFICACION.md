@@ -95,8 +95,8 @@ El mismo recorrido de esta sección está automatizado en `.github/scripts/compo
 Parta de los datos iniciales (sección 7 si ya ejecutó el guion anterior).
 
 1. En otra terminal: `docker compose stop mailpit`.
-2. Refresque la UI: el chip pasa a **"SMTP no disponible"**; `http://localhost:8080/health/ready` muestra el check `smtp` en `Degraded` y `mongo` en `Healthy`.
-3. Pulse "Ejecutar recordatorios (todos)". Resultado: **Candidatas 7 · Correos enviados 0 · Correos fallidos 7**; las 7 filas son "Correo fallido (estado intacto)" (`EmailFailed`) con el error "No se pudo entregar el correo a {to} vía mailpit:1025: …". Las tarjetas siguen en **4/3/1/2**: ningún estado cambió.
+2. Refresque la UI: el chip pasa a **"SMTP no disponible"**, con el detalle del check como texto visible debajo; `http://localhost:8080/health/ready` muestra el check `smtp` en `Degraded` y `mongo` en `Healthy`.
+3. Pulse "Ejecutar recordatorios (todos)". Resultado: **Candidatas 7 · Correos enviados 0 · Correos fallidos 7**; las 7 filas son "Correo fallido (estado intacto)" (`EmailFailed`) con el detalle genérico "El correo no se entregó; el estado no cambió." (sin direcciones ni datos del servidor; la causa técnica queda en `docker compose logs app`). Las tarjetas siguen en **4/3/1/2**: ningún estado cambió.
 4. `docker compose start mailpit`. El chip vuelve a verde.
 5. Pulse de nuevo: 7 enviados y 7 actualizadas; Mailpit recibe los 7 correos.
 
@@ -117,7 +117,7 @@ dotnet test
 
 (o `dotnet test tests/InvoiceReminders.UnitTests` para el proyecto de pruebas). Es el `dotnet test` clásico (VSTest): el proyecto usa `xunit.v3.mtp-off` 4.0.2, la variante oficial de xunit.v3 que desactiva Microsoft Testing Platform, y se ejecuta a través de `xunit.runner.visualstudio` y `Microsoft.NET.Test.Sdk`.
 
-Esperado: 42 casos de prueba en verde (36 métodos `[Fact]`/`[Theory]`; los dos `[Theory]` de `ReminderPolicyTests` aportan 8 casos `[InlineData]`) en menos de 3 segundos: política de transiciones y literales de estado, compositor de correo, caso de uso con sus invariantes y caminos de fallo, semilla (7 → 4 → 0) y grafo de DI. Las pruebas usan dobles escritos a mano (`tests/InvoiceReminders.UnitTests/Fakes`), sin MongoDB ni SMTP.
+Esperado: 62 casos de prueba en verde (48 métodos `[Fact]`/`[Theory]`; los cinco `[Theory]` aportan 19 casos: 8 `[InlineData]` en `ReminderPolicyTests`, 6 en `CustomerTests` y 5 entradas de `[MemberData]` en `MailKitEmailSenderTests`) en menos de 3 segundos: política de transiciones y literales de estado, validación del correo del cliente, compositor de correo, caso de uso con sus invariantes y caminos de fallo (incluidos el corte del lote cuando MongoDB falla y el apagado entre facturas y entre clientes), semilla (7 → 4 → 0), grafo de DI, mapeo a documentos de MongoDB y la regla que decide qué es un fallo de entrega SMTP. Las pruebas usan dobles escritos a mano (`tests/InvoiceReminders.UnitTests/Fakes`), sin MongoDB ni SMTP.
 
 No hay pruebas de integración ni pruebas del frontend; el frontend se valida con la compilación estricta de TypeScript (`npm run build` = `tsc && vite build`, que se ejecuta dentro del build de Docker).
 
@@ -147,7 +147,7 @@ No hay proyecto `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose
 | [ ] | **CA-05** Correo de segundo recordatorio | Ejecución 1: 3 correos con asunto `Factura {numero}: aviso de desactivación del servicio`. |
 | [ ] | **CA-06** Transición 1→2 | `FAC-2026-0101` pasa a `segundorecordatorio` tras la ejecución 1 (UI, o en Mongo: `docker compose exec mongo mongosh invoice_reminders --quiet --eval "db.facturas.find({}, {estado: 1})"`). |
 | [ ] | **CA-07** Transición 2→desactivado | `FAC-2026-0102` pasa a `desactivado` tras la ejecución 1; `historialEstados` tiene una entrada nueva con `motivo: "recordatorio"`, `ejecucionId` y `mensajeId`. |
-| [ ] | **CA-08** Orden correo → actualización | Sección 6: con Mailpit detenido, 7 `EmailFailed` y tarjetas 4/3/1/2 intactas; el lote no se interrumpe. |
+| [ ] | **CA-08** Orden correo → actualización | Sección 6: con Mailpit detenido, 7 `EmailFailed` y tarjetas 4/3/1/2 intactas; un fallo de correo no interrumpe el lote (solo un fallo de MongoDB lo detiene). |
 | [ ] | **CA-09** Estados no contemplados intactos | Tras las tres ejecuciones, la tarjeta "Pagadas" sigue en 2 y `0203` sigue siendo la única `desactivado` sin correo. |
 | [ ] | **CA-10** Un paso por ejecución | `0101`: `primerrecordatorio` → `segundorecordatorio` (ejecución 1) → `desactivado` (ejecución 2); nunca dos saltos en una ejecución. |
 | [ ] | **CA-11** Tres clientes | Mailpit: 3 destinatarios distintos; cada correo nombra en el asunto una factura del cliente destinatario (tabla de la sección 5). Resumen por cliente en la UI. |
@@ -155,7 +155,7 @@ No hay proyecto `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose
 | [ ] | **CA-13** Datos reproducibles | En un clon limpio, `docker compose up --build` deja 3 clientes y 10 facturas sin intervención manual; `GET /api/invoices` devuelve `total: 10` y 3 `customers`. |
 | [ ] | **CA-14** Stack exigido | `InvoiceReminders.slnx` compila y depura en Visual Studio 2026 con .NET 10 y C#; `web/` es React (Vite + TypeScript) y consume `/api`. |
 | [ ] | **CA-15** Inyección de dependencias | `Application/DependencyInjection.cs` e `Infrastructure/DependencyInjection.cs`; el caso de uso recibe `ICustomerRepository`, `IInvoiceRepository`, `IReminderEmailComposer`, `IEmailSender` por constructor; `ProcessRemindersUseCaseTests` lo construye con dobles; `DependencyInjectionTests` valida el grafo real. |
-| [ ] | **CA-16** Pruebas unitarias | `dotnet test` en verde sin Mongo ni SMTP (42 casos); cubre ambas transiciones, selección de plantilla, exclusión de estados, no actualización si falla el envío, tres clientes sin cruces e invariantes de contadores. |
+| [ ] | **CA-16** Pruebas unitarias | `dotnet test` en verde sin Mongo ni SMTP (62 casos); cubre ambas transiciones, selección de plantilla, exclusión de estados, no actualización si falla el envío, tres clientes sin cruces e invariantes de contadores. |
 | [ ] | **CA-17** Documentación y entrega | `README.md` operativo; `docs/ARQUITECTURA.md`, `docs/DECISIONES.md` + ADR, esta guía y `docs/ENTREGA.md`; el repositorio no reproduce el enunciado de la prueba técnica. |
 
 ## 11. Troubleshooting

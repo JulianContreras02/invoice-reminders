@@ -44,8 +44,8 @@ src/InvoiceReminders.Api/wwwroot/
 # Configuración local de puertos del host; la plantilla .env.example SÍ se versiona
 .env
 !.env.example
-# Archivo que genera el asistente de Docker Compose de Visual Studio; se elimina
-# a mano y lo que Visual Studio necesita vive en docker-compose.vs.yml
+# Lo que genera el asistente de Docker de Visual Studio no se versiona: la CLI de
+# Docker Compose lo mezclaría con docker-compose.yml en la máquina del revisor
 docker-compose.override.yml
 
 # ---------------------------------------------------------------------------

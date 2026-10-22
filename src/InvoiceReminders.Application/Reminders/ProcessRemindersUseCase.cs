@@ -187,5 +187,5 @@ public sealed class ProcessRemindersUseCase(
         string? newStatus = null,
         string? messageId = null,
         string? error = null) =>
-        new(invoice.Id, customer.Id, customer.Name, customer.Email, invoice.Status.Value, newStatus, kind, messageId, error);
+        new(invoice.Id, customer.Id, customer.Name, invoice.Status.Value, newStatus, kind, messageId, error);
 }

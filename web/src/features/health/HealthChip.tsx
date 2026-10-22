@@ -1,5 +1,7 @@
 import type { HealthReport } from '../../api/types';
 
+const SERVICE_NAMES: Record<string, string> = { mongo: 'MongoDB', smtp: 'SMTP' };
+
 export function HealthChip({ health }: { health: HealthReport | null }) {
   if (!health) {
     return <span className="chip chip--muted">Comprobando servicios…</span>;
@@ -10,10 +12,11 @@ export function HealthChip({ health }: { health: HealthReport | null }) {
     return <span className="chip chip--ok">API, MongoDB y SMTP listos</span>;
   }
 
-  const names = failing.map((check) => (check.name === 'smtp' ? 'SMTP' : 'MongoDB')).join(' y ');
+  const names = failing.map((check) => SERVICE_NAMES[check.name] ?? check.name).join(' y ');
   return (
-    <span className="chip chip--error" title={failing.map((check) => check.description).join(' ')}>
-      {names} no disponible
-    </span>
+    <div className="health" role="status">
+      <span className="chip chip--error">{names} no disponible</span>
+      {failing.map((check) => check.description && <small key={check.name}>{check.description}</small>)}
+    </div>
   );
 }

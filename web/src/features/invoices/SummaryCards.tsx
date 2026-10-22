@@ -1,21 +1,10 @@
 import type { InvoiceSummary } from '../../api/types';
-
-interface Card {
-  label: string;
-  value: number;
-  tone: string;
-}
+import { countOtherStatuses, KNOWN_STATUSES } from './statusLabels';
 
 export function SummaryCards({ summary }: { summary: InvoiceSummary }) {
-  const counts = summary.countsByStatus;
-  const known = (counts.primerrecordatorio ?? 0) + (counts.segundorecordatorio ?? 0) + (counts.desactivado ?? 0) + (counts.pagada ?? 0);
-
-  const cards: Card[] = [
-    { label: 'Primer recordatorio', value: counts.primerrecordatorio ?? 0, tone: 'first' },
-    { label: 'Segundo recordatorio', value: counts.segundorecordatorio ?? 0, tone: 'second' },
-    { label: 'Desactivadas', value: counts.desactivado ?? 0, tone: 'deactivated' },
-    { label: 'Pagadas', value: counts.pagada ?? 0, tone: 'paid' },
-    { label: 'Otros estados', value: summary.total - known, tone: 'other' },
+  const cards = [
+    ...KNOWN_STATUSES.map((info) => ({ label: info.pluralLabel, value: summary.countsByStatus[info.status] ?? 0, tone: info.tone })),
+    { label: 'Otros estados', value: countOtherStatuses(summary.countsByStatus), tone: 'other' },
     { label: 'Total', value: summary.total, tone: 'total' },
   ];
 

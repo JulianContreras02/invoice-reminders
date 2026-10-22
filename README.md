@@ -1,11 +1,3 @@
-<!--
-PENDIENTES ANTES DE ENTREGAR (quitar este bloque en el último commit):
-- Subir el repositorio privado a GitHub y confirmar el CI en verde: el trabajo compose-smoke es la primera
-  ejecución real del docker compose (en el equipo de desarrollo no hay Docker).
-- Crear el tag `v1.0.0` y comprobar que este README describe exactamente lo que hay en ese tag.
-- Ensayar el inicio rápido en un clon limpio sin .NET ni Node antes de enviar.
--->
-
 # invoice-reminders
 
 > El código apunta a **.NET 10** y la solución requiere **Visual Studio 2026 (18.x)** para soporte oficial (VS 2022 17.14 con el SDK 10 abre y compila con warning, sin soporte). El despliegue con `docker compose` **no depende de Visual Studio**.
@@ -41,7 +33,7 @@ Todos los puertos se publican solo en `127.0.0.1`.
 ## Ejecutar el proceso de recordatorios
 
 1. Abra http://localhost:8080. Verá 10 facturas de 3 clientes, las tarjetas de conteo por estado y el resumen por cliente.
-2. Pulse **Ejecutar recordatorios (todos)** (o **Ejecutar solo para {cliente}** si hay un cliente filtrado). El panel de resultado muestra los contadores, el `runId` y una fila por factura con el desenlace.
+2. Pulse **Ejecutar recordatorios (todos)** (o **Ejecutar solo para {cliente}** si hay un cliente filtrado). El panel de resultado muestra los contadores, el `runId`, si la ejecución fue interrumpida (apagado de la aplicación) o detenida (MongoDB no respondió) y una fila por factura con el desenlace.
 3. Abra http://localhost:8025 (o el enlace **Ver correos enviados (Mailpit)** del encabezado). Con los datos iniciales la secuencia es determinista:
 
 | Ejecución | Correos | Qué cambia |
@@ -113,7 +105,7 @@ dotnet test                                   # desde la raíz (InvoiceReminders
 dotnet test tests/InvoiceReminders.UnitTests  # solo el proyecto de pruebas
 ```
 
-El proyecto `tests/InvoiceReminders.UnitTests` usa `xunit.v3.mtp-off` 4.0.2, la variante oficial de xunit.v3 que desactiva Microsoft Testing Platform, con el `dotnet test` clásico (VSTest, vía `xunit.runner.visualstudio` y `Microsoft.NET.Test.Sdk`), así que también aparece en el Explorador de pruebas de Visual Studio. Son 36 métodos de prueba (42 casos contando cada `[InlineData]`) sobre el dominio, el caso de uso, el compositor de correos, la semilla y el contenedor de dependencias, con dobles escritos a mano en `tests/InvoiceReminders.UnitTests/Fakes`.
+El proyecto `tests/InvoiceReminders.UnitTests` usa `xunit.v3.mtp-off` 4.0.2, la variante oficial de xunit.v3 que desactiva Microsoft Testing Platform, con el `dotnet test` clásico (VSTest, vía `xunit.runner.visualstudio` y `Microsoft.NET.Test.Sdk`), así que también aparece en el Explorador de pruebas de Visual Studio. Son 48 métodos de prueba (62 casos contando cada `[InlineData]` y cada entrada de `[MemberData]`) sobre el dominio, el caso de uso, el compositor de correos, la semilla, el contenedor de dependencias, el mapeo a documentos de MongoDB y la regla de fallos de entrega de `MailKitEmailSender`, con dobles escritos a mano en `tests/InvoiceReminders.UnitTests/Fakes`.
 
 No hay pruebas de integración contra MongoDB/SMTP reales ni pruebas del frontend; el frontend se valida con `tsc` en modo estricto al compilar (`npm run build`). Ver [ADR 0008](docs/adr/0008-estrategia-de-pruebas.md).
 

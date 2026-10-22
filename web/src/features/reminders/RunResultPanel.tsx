@@ -26,9 +26,9 @@ export function RunResultPanel({ result, mailpitUrl }: RunResultPanelProps) {
   ];
 
   return (
-    <section className={`panel result ${result.hasFailures ? 'result--failures' : ''}`} aria-live="polite">
+    <section className={`panel result ${result.hasFailures ? 'result--failures' : ''}`} aria-labelledby="run-result-title">
       <div className="result__header">
-        <h2>Resultado de la ejecución</h2>
+        <h2 id="run-result-title">Resultado de la ejecución</h2>
         {mailpitUrl && (
           <a className="button button--secondary" href={mailpitUrl} target="_blank" rel="noreferrer">
             Abrir Mailpit

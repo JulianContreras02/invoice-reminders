@@ -13,9 +13,15 @@ public sealed class InMemoryCustomerRepository : ICustomerRepository
         return this;
     }
 
-    public Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<Customer>>([.. _customers]);
+    public Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<Customer>>([.. _customers]);
+    }
 
-    public Task<Customer?> GetByIdAsync(string customerId, CancellationToken cancellationToken) =>
-        Task.FromResult(_customers.FirstOrDefault(customer => customer.Id == customerId));
+    public Task<Customer?> GetByIdAsync(string customerId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_customers.FirstOrDefault(customer => customer.Id == customerId));
+    }
 }

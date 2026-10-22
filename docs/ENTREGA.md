@@ -44,8 +44,8 @@ Se construyó un proceso en .NET 10 y C# que, conectado a MongoDB, toma las fact
 |---|---|
 | Clean Code y SOLID | `ReminderPolicy` como única tabla de transiciones; `InvoiceStatus` como único lugar con los literales; `ProcessRemindersUseCase` solo orquesta (6 dependencias); puertos de 1-2 métodos; referencias de `.csproj` hacia Domain; analizadores (`AnalysisLevel latest`, `EnforceCodeStyleInBuild`) y warnings como errores con `ContinuousIntegrationBuild=true`; `.editorconfig` |
 | Documentación, planteamiento y arquitectura | `README.md`, `docs/ARQUITECTURA.md` (Mermaid: componentes, estados, secuencia, modelo de datos), `docs/adr/0001…0010`, `docs/VERIFICACION.md`, este documento |
-| Pruebas unitarias | `tests/InvoiceReminders.UnitTests` (`xunit.v3.mtp-off`, la variante oficial de xunit.v3 sin Microsoft Testing Platform; 36 métodos / 42 casos, < 3 s, sin servicios externos); dobles escritos a mano en `Fakes/` (repositorio en memoria con compare-and-set, `OperationJournal` para el orden envío → actualización); `dotnet test` |
-| Inyección de dependencias | `Application/DependencyInjection.cs`, `Infrastructure/DependencyInjection.cs`, `Program.cs` de ~60 líneas, `IOptions<T>` validadas con `ValidateOnStart()`, `DependencyInjectionTests` con `ValidateOnBuild`; tabla abstracción → implementación → lifetime con razón en `docs/ARQUITECTURA.md` |
+| Pruebas unitarias | `tests/InvoiceReminders.UnitTests` (`xunit.v3.mtp-off`, la variante oficial de xunit.v3 sin Microsoft Testing Platform; 48 métodos / 62 casos, < 3 s, sin servicios externos); dobles escritos a mano en `Fakes/` (repositorio en memoria con compare-and-set, `OperationJournal` para el orden envío → actualización); `dotnet test` |
+| Inyección de dependencias | `Application/DependencyInjection.cs`, `Infrastructure/DependencyInjection.cs`, `Program.cs` de menos de 70 líneas, `IOptions<T>` validadas con `ValidateOnStart()`, `DependencyInjectionTests` con `ValidateOnBuild`; tabla abstracción → implementación → lifetime con razón en `docs/ARQUITECTURA.md` |
 | Frontend (React) | `web/` con Vite 8 + React 19 + TypeScript strict; compilado dentro de la imagen y servido desde `wwwroot` en el mismo origen |
 | Desarrollo en Visual Studio | `InvoiceReminders.slnx`, perfiles `http`/`https` en `launchSettings.json` (abren `/scalar`), `InvoiceReminders.Api.http`, Explorador de pruebas con xunit.v3 (`xunit.v3.mtp-off`), depuración local con `docker compose up -d mongo mailpit` |
 
@@ -56,7 +56,7 @@ Se construyó un proceso en .NET 10 y C# que, conectado a MongoDB, toma las fact
 - **Un correo por factura** (1 correo = 1 transición = 1 entrada de historial). Consolidar por cliente queda como mejora.
 - **Disparo manual** (`POST /api/reminders/run` y botón en la UI); nunca al arrancar; sin temporizador. Puede ejecutarse para todos los clientes o para uno.
 - **Un paso por ejecución**, sin ventanas de tiempo (el proceso no las define). Estados distintos de `primerrecordatorio` y `segundorecordatorio` se ignoran (ni correo ni cambio) y se muestran en la UI.
-- **Fallos:** si falla el correo, el estado no cambia, se registra y el lote continúa. Si el correo salió y la actualización falla, queda como inconsistencia visible y rastreable por `Message-ID`.
+- **Fallos:** si falla el correo, el estado no cambia, se registra y el lote continúa con la siguiente factura. Si el correo salió y la actualización falla, queda como inconsistencia visible y rastreable por `Message-ID`, y el lote se detiene para no enviar correos que no podrían registrarse; lo mismo si MongoDB falla al leer las facturas de un cliente. Los mensajes de error que ve el usuario son genéricos, sin datos personales; el detalle técnico queda en el log.
 - **"Desactivado"** solo cambia el estado de la factura; el correo anuncia la desactivación del servicio como hecho futuro.
 - **SMTP real** tras una interfaz; en la demo apunta a Mailpit (un simple log no cumpliría "enviar un correo"); la semilla usa el dominio reservado `.test`. **Sin autenticación** en la demo (solo demo local; puertos publicados únicamente en loopback).
 
@@ -70,8 +70,8 @@ Monolito modular en .NET 10 con cuatro proyectos de producto (Domain, Applicatio
 |---|---|---|
 | Domain | nada | `Customer`, `Invoice`, `InvoiceStatus`, `ReminderPolicy` (tabla de transiciones) |
 | Application | Domain | puertos (`IInvoiceRepository`, `IInvoiceSummaryQueries`, `ICustomerRepository`, `IEmailSender`), `ProcessRemindersUseCase`, compositor y plantillas de correo, DTOs de resumen |
-| Infrastructure | Application | repositorios Mongo con CAS, `MailKitEmailSender`, semilla, health checks, options validadas, arranque (`InitializeInfrastructureAsync`: esperar Mongo → índices → semilla) |
-| Api | Application + Infrastructure | composición, endpoints Minimal API, `OperationGate` + `SingleOperationFilter` (409), traducción de errores, SPA |
+| Infrastructure | Application | repositorios Mongo con CAS, `MailKitEmailSender`, semilla, health checks, options validadas, arranque (`IInfrastructureInitializer`: esperar Mongo → índices → semilla) |
+| Api | Application + Infrastructure | composición, endpoints Minimal API, `LinksOptions`, `OperationGate` + `SingleOperationFilter` (409), traducción de errores, SPA |
 
 **Estados de la factura** (misma tabla que `ReminderPolicy.Transitions`):
 
@@ -83,7 +83,7 @@ Monolito modular en .NET 10 con cuatro proyectos de producto (Domain, Applicatio
 
 ![Diagrama de secuencia](img/secuencia.png)
 
-Por cliente y por factura elegible: `ReminderPolicy.TryGetTransition` → validación del correo del cliente → `Compose` → `SendAsync` (si lanza `EmailDeliveryException`: desenlace `EmailFailed`, estado intacto) → `TryAdvanceStatusAsync` con filtro `{_id, estado: anterior}` (`UpdateOneAsync` con `$set` + `$push` al historial, éxito si `MatchedCount == 1`; `false` → `UpdateConflict`; excepción → `UpdateFailedAfterSend`). El lote corre con el token de apagado de la aplicación, no con el de la petición; la cancelación se comprueba solo entre facturas. Ejecuciones simultáneas se rechazan con `409`.
+Por cliente y por factura elegible: `ReminderPolicy.TryGetTransition` → validación del correo del cliente (`Customer.HasDeliverableEmail()`) → `Compose` → `SendAsync` (si lanza `EmailDeliveryException`: desenlace `EmailFailed`, estado intacto, sigue la siguiente factura) → `TryAdvanceStatusAsync` con filtro `{_id, estado: anterior}` (`UpdateOneAsync` con `$set` + `$push` al historial, éxito si `MatchedCount == 1`; `false` → `UpdateConflict`; excepción → `UpdateFailedAfterSend` y el lote se detiene). El lote corre con el token de apagado de la aplicación, no con el de la petición; el apagado se atiende solo entre facturas y entre clientes, porque cada factura es una unidad de trabajo cuyo envío y actualización no se interrumpen. Cómo terminó la ejecución queda en `RunCompletion` (`Completed`, `Cancelled` o `StoppedPersistenceUnavailable`). Ejecuciones simultáneas se rechazan con `409`.
 
 **Modelo de datos e índices.** Base `invoice_reminders`; colecciones `clientes` (`_id`, `nombre`, `email`, `creadoEn`) y `facturas` (`_id` = número de factura, p. ej. `FAC-2026-0102`; `clienteId`, `monto` como `Decimal128`, `moneda`, `fechaEmision`, `fechaVencimiento`, `estado`, `historialEstados[]`, `actualizadoEn`). Índices: `facturas {clienteId:1, estado:1}` y `clientes {email:1} unique`, creados de forma idempotente al arrancar. Campos en español porque `estado` es el contrato visible; código en inglés con la traducción en `DocumentMappers`. **Contrato de la API:** anexo C; JSON camelCase, errores `application/problem+json` (RFC 9457) con `traceId`, documento OpenAPI en `/openapi/v1.json` y documentación interactiva (Scalar) en `/scalar`.
 
@@ -106,9 +106,9 @@ Cada ADR (contexto, decisión, alternativas, consecuencias) está en `docs/adr/`
 
 ## 5. Calidad y pruebas
 
-- **Unitarias** (`tests/InvoiceReminders.UnitTests`, 36 métodos / 42 casos): política de transiciones como `[Theory]` y literales de `InvoiceStatus`, compositor (destinatario, asuntos, `es-CO`, cabeceras, `Message-ID`, nombre con `&`, plantilla faltante), caso de uso (orden enviar → actualizar, fallo de envío sin cambio de estado, conflicto CAS, fallo de actualización tras el envío, cliente sin correo válido, cancelación entre facturas, tres clientes sin cruces, historial con `runId` y `Message-ID`, invariantes de contadores), semilla (7 → 4 → 0) y grafo de DI. Dobles escritos a mano en `Fakes/` (`InMemoryInvoiceRepository` con semántica compare-and-set, `InMemoryCustomerRepository`, `RecordingEmailSender`, `OperationJournal`, `FixedTimeProvider`). Sin Docker ni red; < 3 s.
+- **Unitarias** (`tests/InvoiceReminders.UnitTests`, 48 métodos / 62 casos): política de transiciones como `[Theory]` y literales de `InvoiceStatus`, validación del correo del cliente (`CustomerTests`), compositor (destinatario, asuntos, `es-CO`, cabeceras, `Message-ID`, nombre con `&`, plantilla faltante), caso de uso (orden enviar → actualizar, fallo de envío sin cambio de estado, conflicto CAS, fallo de actualización tras el envío y corte del lote, corte si falla la lectura de un cliente, cliente sin correo válido, apagado entre facturas y antes del siguiente cliente, ningún envío ni actualización con un token cancelable, tres clientes sin cruces, historial con `runId` y `Message-ID`, invariantes de contadores), semilla (7 → 4 → 0), grafo de DI, mapeo a documentos de MongoDB (`DocumentMappersTests`: ida y vuelta, fechas UTC, estado ausente) y la regla `IsDeliveryFailure` de `MailKitEmailSender`. Dobles escritos a mano en `Fakes/` (`InMemoryInvoiceRepository` con semántica compare-and-set y fallos de lectura o escritura simulables, `InMemoryCustomerRepository`, `RecordingEmailSender`, `OperationJournal`, `FixedTimeProvider`). Sin Docker ni red; < 3 s.
 - **Integración:** no incluida. Las pruebas contra MongoDB real con Testcontainers quedan como evolución (sección 8).
-- **Manual / extremo a extremo:** guía de la sección 7 y `docs/VERIFICACION.md` con capturas. `MailKitEmailSender` no se prueba por unidad (sería probar MailKit); se valida contra Mailpit.
+- **Manual / extremo a extremo:** guía de la sección 7 y `docs/VERIFICACION.md` con capturas. De `MailKitEmailSender` solo se prueba por unidad la regla que decide qué es un fallo de entrega; el envío real (sería probar MailKit) se valida contra Mailpit.
 - **Frontend:** sin pruebas de componentes ni ESLint; la verificación es la compilación estricta de TypeScript (`npm run build` = `tsc && vite build`, ejecutada en el build de Docker).
 
 ```bash
@@ -117,7 +117,7 @@ dotnet test
 
 Es el `dotnet test` clásico (VSTest), gracias a `xunit.v3.mtp-off` (variante oficial de xunit.v3 que desactiva Microsoft Testing Platform), desde la raíz de la solución (`InvoiceReminders.slnx`); también `dotnet test tests/InvoiceReminders.UnitTests`.
 
-Resultado: 42 casos (36 métodos) en verde en unos 2 s, sin Docker ni red; compilación Release con `-p:ContinuousIntegrationBuild=true` sin advertencias. Estándares: `Directory.Build.props` con `AnalysisLevel latest` y `EnforceCodeStyleInBuild`; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true`; `.editorconfig`; async de punta a punta con `CancellationToken`; sin `catch` vacíos.
+Resultado: 62 casos (48 métodos) en verde en unos 2 s, sin Docker ni red; compilación Release con `-p:ContinuousIntegrationBuild=true` sin advertencias. Estándares: `Directory.Build.props` con `AnalysisLevel latest` y `EnforceCodeStyleInBuild`; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true`; `.editorconfig`; async de punta a punta con `CancellationToken`; sin `catch` vacíos.
 
 CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit. [PENDIENTE FASE 4: enlace a la primera ejecución en verde.]
 
@@ -127,7 +127,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 |---|---|---|
 | 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
 | 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
-| 3. Pruebas | 42 pruebas unitarias en verde; compilación estricta sin advertencias; arranque con configuración inválida verificado (código 1 y mensaje con la variable); guion completo automatizado en el CI | Parcial: [PENDIENTE FASE 3: primera ejecución del CI en GitHub, escenario SMTP caído en vivo] |
+| 3. Pruebas | 62 casos de prueba unitaria en verde; compilación estricta sin advertencias; arranque con configuración inválida verificado (código 1 y mensaje con la variable); guion completo automatizado en el CI | Parcial: [PENDIENTE FASE 3: primera ejecución del CI en GitHub, escenario SMTP caído en vivo] |
 | 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION, este documento | En curso: [PENDIENTE FASE 4: capturas, PDF y tag `v1.0.0`] |
 
 - Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. Los de lógica (CA-02 a CA-11, CA-15, CA-16) están cubiertos por pruebas unitarias; los de despliegue e interfaz (CA-01, CA-12, CA-13) los ejecuta el trabajo `compose-smoke` del CI. [PENDIENTE FASE 4: marcar cada uno tras la primera ejecución en verde y el ensayo manual con capturas.]
@@ -140,6 +140,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
   - **Comentario XML inválido.** Un comentario en `Directory.Build.props` contenía dos guiones seguidos y MSBuild no podía cargar el archivo; se reescribió.
   - **Arranque ordenado con Mailpit.** Se comprobó en el Dockerfile oficial de Mailpit que su imagen declara un `HEALTHCHECK`, y la aplicación espera con `service_healthy` para que el indicador de salud arranque en verde.
   - **Entorno sin Docker.** El equipo de desarrollo no tenía Docker; por eso el CI levanta el compose real y ejecuta el guion del revisor en cada push.
+  - **Revisión interna del proceso.** Se detectó que un apagado durante un envío perdía el resultado del lote, que un fallo al cerrar la conexión SMTP podía duplicar correos y que con MongoDB caído el lote seguía enviando. Se corrigió con `RunCompletion`, la factura como unidad de trabajo (envío y actualización sin token cancelable; el correo cuenta como entregado en cuanto el servidor lo acepta) y el corte del lote con `StoppedPersistenceUnavailable`, con pruebas para cada caso.
 
 ## 7. Guía de verificación
 
@@ -208,7 +209,7 @@ Para un SMTP real solo cambian variables: `Smtp__Port=587` + `Smtp__Security=Sta
 | `GET /api/invoices?customerId=&status=` | `InvoiceSummaryDto { invoices[], countsByStatus{}, customers[], total }` (el resumen por cliente sale de `customers[]`) |
 | `POST /api/reminders/run[?customerId=]` | 200 `ReminderRunResult` · 404 cliente · 409 operación en curso |
 | `POST /api/admin/seed/reset` | 200 `SeedResult` · 403 si `Seed:AllowReset=false` · 409 en curso |
-| `GET /api/meta` | `{ version, environment, mailpitUrl, allowReset, smtpHost, smtpPort, mongoDatabase }` |
+| `GET /api/meta` | `{ version, environment, mailpitUrl, allowReset }` |
 | `GET /health/live` · `GET /health/ready` | 200 · 200/503 con `{ status, checks: [{ name: "mongo" \| "smtp", status, description }] }` |
 | `GET /openapi/v1.json` · `GET /scalar` | Documento OpenAPI · documentación interactiva |
 | Otra ruta bajo `/api` | 404 |

@@ -12,8 +12,9 @@ Restricciones de despliegue: el revisor levanta todo con `docker compose up --bu
 
 - **React 19 + Vite 8 + TypeScript strict**: React 19.3.1, Vite 8.3.5, `@vitejs/plugin-react` 6.1.2 y TypeScript 5.9.3 con `strict`, `noUnusedLocals`, `noUnusedParameters` y `noUncheckedIndexedAccess`. Node ≥ 22.12 (Vite 8 es solo ESM) declarado en `engines` de `package.json`; el Dockerfile usa `node:22-alpine`. `npm run build` es `tsc && vite build`.
 - Sin router, sin gestor de estado global, sin librería de componentes: CSS plano con variables, tabla semántica, botones con texto y foco visible. Sin ESLint y sin pruebas de componentes (Vitest no está instalado): la verificación del frontend es la compilación estricta de `tsc`.
-- Estructura por features en `web/src/`: `main.tsx`, `styles.css`, `api/{client.ts,types.ts}`, `features/invoices/{InvoicesPage,InvoiceTable,SummaryCards,CustomerSummary,InvoiceFilters,StatusBadge,statusLabels.ts,format.ts}`, `features/reminders/RunResultPanel.tsx`, `features/health/HealthChip.tsx`. Las acciones (ejecutar, ejecutar por cliente, reiniciar) son botones de `InvoicesPage`.
-- Los datos vienen del backend, no se calculan en el front: conteos por estado y por cliente de `GET /api/invoices`, salud de `/health/ready` (JSON por check) y la URL de Mailpit **solo** de `/api/meta` (ninguna variable `VITE_*`).
+- Estructura por features en `web/src/`: `main.tsx`, `styles.css`, `api/{client.ts,types.ts,errors.ts}`, `features/invoices/{InvoicesPage,InvoiceTable,SummaryCards,CustomerSummary,InvoiceFilters,StatusBadge,statusLabels.ts,format.ts,useInvoiceData.ts,useMeta.ts,useOperation.ts}`, `features/reminders/RunResultPanel.tsx`, `features/health/HealthChip.tsx`. Las acciones (ejecutar, ejecutar por cliente, reiniciar) son botones de `InvoicesPage`; el estado y las llamadas viven en hooks: `useInvoiceData` (descarta respuestas obsoletas si cambia el filtro y recarga con el filtro vigente), `useMeta` y `useOperation` (una operación a la vez; un 409 se muestra como aviso). Las etiquetas de estado salen de una única lista, `KNOWN_STATUSES` en `statusLabels.ts`.
+- Los datos vienen del backend: conteos por estado y por cliente de `GET /api/invoices`, salud de `/health/ready` (JSON por check) y la URL de Mailpit **solo** de `/api/meta` (ninguna variable `VITE_*`). El front no recalcula conteos; solo agrupa en la tarjeta "Otros estados" los conteos que el backend devuelve para estados fuera de `KNOWN_STATUSES`.
+- Accesibilidad básica: botones y filtros deshabilitados durante una operación, `aria-busy` en la página, región `aria-live` montada desde el inicio para anunciar cada resultado y el detalle de salud como texto visible.
 - **Servido desde la API**: la etapa `web` del Dockerfile (`node:22-alpine`) ejecuta `npm ci` con el `package-lock.json` versionado y `npm run build`, y la etapa `final` copia `/web/dist` a `wwwroot`. `Program.cs` usa `UseDefaultFiles`, `UseStaticFiles` y `MapFallbackToFile("index.html")`. Un contenedor, un puerto (`8080`), un origen.
 - **Sin CORS**: en compose la UI y la API comparten origen; en desarrollo `vite.config.ts` (puerto 5173) hace proxy de `/api` y `/health` a `http://localhost:5080` (perfil `http` de la API).
 - **Sin target MSBuild que ejecute npm** durante el build de Visual Studio: el desarrollo del front es `npm run dev`; el build del front ocurre solo en Docker (o a mano con `npm run build`). `wwwroot/` se genera dentro de la imagen y se ignora en git.
@@ -33,7 +34,7 @@ Positivas:
 
 - El revisor no necesita Node: el frontend llega compilado dentro de la imagen de la API.
 - Un contenedor y un puerto menos; sin CORS que configurar ni explicar.
-- La UI no decide transiciones ni conoce Mongo: toda la lógica queda en el backend, probada por unidad; por eso se aceptó no tener pruebas de componentes por ahora (Vitest + React Testing Library quedan como evolución).
+- La UI no decide transiciones ni conoce Mongo: toda la lógica de negocio queda en el backend, probada por unidad; por eso se aceptó no tener pruebas de componentes por ahora (Vitest + React Testing Library quedan como evolución).
 
 Negativas y lo que se acepta a cambio:
 

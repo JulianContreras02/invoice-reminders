@@ -71,7 +71,9 @@ internal sealed class MailKitEmailSender(IOptions<SmtpOptions> options, ILogger<
         {
             await client.DisconnectAsync(quit: true, CancellationToken.None);
         }
-        catch (Exception ex) when (IsDeliveryFailure(ex, CancellationToken.None))
+#pragma warning disable CA1031 // El servidor ya aceptó el mensaje: ningún fallo al cerrar puede convertirlo en "no enviado".
+        catch (Exception ex)
+#pragma warning restore CA1031
         {
             logger.LogDebug(ex, "El correo {MessageId} ya fue aceptado; falló solo el cierre de la conexión SMTP", messageId);
         }

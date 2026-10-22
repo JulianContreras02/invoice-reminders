@@ -11,7 +11,7 @@ Requisitos que condicionan la elección:
 - Dos operaciones (`POST /api/reminders/run` y `POST /api/admin/seed/reset`) deben serializarse en una sola instancia: una segunda llamada concurrente responde 409.
 - Los errores se devuelven como ProblemDetails (RFC 9457) con `traceId`, y `CustomerNotFoundException` se traduce a 404.
 - OpenAPI debe estar disponible siempre (`/openapi/v1.json` con documentación interactiva en `/scalar`) para que el revisor pueda ejecutar el proceso sin la UI.
-- `Program.cs` debe mantenerse en torno a 60 líneas, con la composición delegada a `AddApplication()` y `AddInfrastructure(IConfiguration)`.
+- `Program.cs` debe mantenerse corto (hoy, menos de 70 líneas), con la composición delegada a `AddApplication()` y `AddInfrastructure(IConfiguration)`.
 
 ## Decisión
 
@@ -23,7 +23,8 @@ Se usa **Minimal API** de ASP.NET Core:
 - Exclusión de operaciones simultáneas en `src/InvoiceReminders.Api/Concurrency`: `OperationGate` (singleton con un `SemaphoreSlim(1,1)`) y `SingleOperationFilter` (`IEndpointFilter`), aplicado con `AddEndpointFilter<SingleOperationFilter>()` a `POST /api/reminders/run` y `POST /api/admin/seed/reset`; si no entra en la puerta de inmediato devuelve 409 ProblemDetails "Operación en curso".
 - `AddProblemDetails()` y `AddExceptionHandler<ApiExceptionHandler>()`: `CustomerNotFoundException` → 404, resto → 500 con `traceId`.
 - OpenAPI nativo con `AddOpenApi()`/`MapOpenApi()` (paquete `Microsoft.AspNetCore.OpenApi` 10.0.13) y documentación interactiva con `Scalar.AspNetCore` 2.18.2 (`MapScalarApiReference()`, en `/scalar`).
-- `ReminderEndpoints` pasa al caso de uso `IHostApplicationLifetime.ApplicationStopping` como token, no `HttpContext.RequestAborted` (ADR 0004).
+- `ReminderEndpoints` pasa al caso de uso `IHostApplicationLifetime.ApplicationStopping` como token, no `HttpContext.RequestAborted` (ADR 0004); `AdminEndpoints` usa el mismo token para el reinicio de la semilla, de modo que cerrar la pestaña no deja la base a medio reiniciar.
+- `GET /api/meta` devuelve solo `{ version, environment, mailpitUrl, allowReset }`. `LinksOptions` (URL de Mailpit) es configuración de presentación: vive en la Api y se registra en `Program.cs` con `BindConfiguration("Links")`.
 - Los endpoints consumen `IInvoiceSummaryQueries` directamente; no hay clase intermedia sin lógica.
 - Sin CORS: en desarrollo Vite hace proxy y en compose la UI es del mismo origen (ADR 0006).
 

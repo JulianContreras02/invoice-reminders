@@ -13,21 +13,24 @@ Condiciones del ecosistema en la fecha: xUnit v2 figura como deprecado en NuGet 
 - **Un solo proyecto de pruebas:** `tests/InvoiceReminders.UnitTests` (`OutputType Exe`, `IsTestProject`). No hay proyecto de pruebas de integración ni biblioteca compartida de dobles.
 - **Framework y runner:** `xunit.v3.mtp-off 4.0.2` (la variante oficial de xunit.v3 que desactiva Microsoft Testing Platform) + `xunit.runner.visualstudio 4.0.1` + `Microsoft.NET.Test.Sdk 18.11.0`, ejecutados con el **`dotnet test` clásico (VSTest)**. `global.json` no configura Microsoft.Testing.Platform. Comando: `dotnet test` desde la raíz (usa `InvoiceReminders.slnx`) o `dotnet test tests/InvoiceReminders.UnitTests`. El Explorador de pruebas de Visual Studio las descubre gracias a `xunit.runner.visualstudio`.
 - **Dobles escritos a mano** en `tests/InvoiceReminders.UnitTests/Fakes`, sin librería de mocks:
-  - `InMemoryInvoiceRepository`: filtra por cliente y estado, y avanza el estado **solo si la factura sigue en el estado esperado** (la misma semántica compare-and-set que `MongoInvoiceRepository`). Permite simular un cambio concurrente (`SimulateConcurrentChange`), hacer fallar las actualizaciones (`FailUpdatesWith`), consultar el historial registrado (`Changes`) y comprobar que el CAS se invocó con un token no cancelable.
+  - `InMemoryInvoiceRepository`: filtra por cliente y estado, y avanza el estado **solo si la factura sigue en el estado esperado** (la misma semántica compare-and-set que `MongoInvoiceRepository`). Permite simular un cambio concurrente (`SimulateConcurrentChange`), hacer fallar las actualizaciones (`FailUpdatesWith`) o la lectura de las facturas de un cliente (`FailReadsFor`), consultar el historial registrado (`Changes`) y comprobar que el CAS se invocó con un token no cancelable. Respeta el `CancellationToken` recibido.
   - `InMemoryCustomerRepository`.
-  - `RecordingEmailSender`: guarda los correos enviados, falla con `EmailDeliveryException` para direcciones concretas (como un SMTP caído) y expone un gancho `AfterSend`.
+  - `RecordingEmailSender`: guarda los correos enviados, falla con `EmailDeliveryException` para direcciones concretas (como un SMTP caído), respeta el `CancellationToken`, registra si algún envío recibió un token cancelable (`AnySendTokenCouldBeCancelled`) y expone un gancho `AfterSend` con el que las pruebas simulan un apagado justo después de un envío.
   - `OperationJournal`: registro ordenado compartido por los dobles; verifica el orden envío → actualización (`send:FAC-1` antes de `update:FAC-1`, y ningún `update` si el envío falla).
   - `FixedTimeProvider`: reloj fijo derivado de `TimeProvider`.
-- **Cobertura** (36 métodos de prueba, 42 casos contando cada `[InlineData]`; < 3 s, sin Docker ni red):
+- **Cobertura** (48 métodos de prueba, 62 casos contando cada `[InlineData]` y cada entrada de `[MemberData]`; < 3 s, sin Docker ni red):
   - `ReminderPolicyTests` (dos `[Theory]` con 8 casos y un `[Fact]`) e `InvoiceStatusTests` (3): máquina de estados y literales del contrato.
+  - `CustomerTests` (dos `[Theory]` con 6 casos): `HasDeliverableEmail` acepta direcciones simples y rechaza vacías, inválidas, con nombre (`"Juan Pérez <juan@perez.test>"`) o con espacios.
   - `ReminderEmailComposerTests` (7): destinatario con nombre y dirección separados, asuntos de ambas plantillas, formato `es-CO`, `Pérez & Asociados S.A.S.` → `&amp;` en HTML y `&` en texto, cabeceras y `Message-ID` determinista, fallo inmediato si falta una plantilla.
-  - `ProcessRemindersUseCaseTests` (14): ambas transiciones, estados ignorados, fallo de envío sin cambio de estado, conflicto CAS, fallo de actualización tras el envío, cliente sin correo válido, cliente inexistente, tres clientes sin cruces (CA-11), un solo cliente, tres ejecuciones consecutivas, cancelación entre facturas con el CAS en `CancellationToken.None`, historial con `runId` y `Message-ID`, invariantes de contadores.
+  - `ProcessRemindersUseCaseTests` (17): ambas transiciones, estados ignorados, fallo de envío sin cambio de estado (y el lote sigue), conflicto CAS, fallo de actualización tras el envío (con el `Message-ID` y sin detalles internos en el error), corte del lote cuando falla la actualización tras enviar, corte cuando falla la lectura de un cliente (conservando lo ya hecho), cliente sin correo válido, cliente inexistente, tres clientes sin cruces (CA-11), un solo cliente, tres ejecuciones consecutivas, apagado entre facturas (ni el envío ni el CAS reciben un token cancelable), apagado antes del siguiente cliente (resultado parcial sin leerlo), historial con `runId` y `Message-ID`, invariantes de contadores.
   - `DemoDataTests` (5): forma de la semilla y la historia 7 → 4 → 0 ejecutando el caso de uso real sobre los dobles.
   - `DependencyInjectionTests` (4): grafo real con `ValidateOnBuild` y `ValidateScopes`, `OptionsValidationException` que cita `Mongo__ConnectionString` y `Smtp__Username`, semilla deshabilitada por defecto.
+  - `DocumentMappersTests` (3): ida y vuelta dominio → documento → dominio sin cambios, fechas guardadas como medianoche UTC y estado como literal exacto, y un documento sin estado que se mapea a un estado desconocido en lugar de fallar.
+  - `MailKitEmailSenderTests` (un `[Theory]` con 5 entradas de `[MemberData]` y tres `[Fact]`): la regla `IsDeliveryFailure` trata como fallo de entrega los problemas de transporte y el timeout propio del cliente, pero no una cancelación pedida por quien llama ni los errores de programación.
   - Nombres `Metodo_Escenario_Resultado`, AAA, un comportamiento por prueba.
-- **Sin pruebas de integración:** no se usa Testcontainers. `MongoInvoiceRepository`, `MongoInvoiceSummaryQueries`, el seeder, los health checks y `MailKitEmailSender` se validan extremo a extremo con `docker compose` y la guía `docs/VERIFICACION.md`.
+- **Sin pruebas de integración:** no se usa Testcontainers. `MongoInvoiceRepository`, `MongoInvoiceSummaryQueries`, el seeder, los health checks y el envío real de `MailKitEmailSender` se validan extremo a extremo con `docker compose` y la guía `docs/VERIFICACION.md`.
 - **Frontend:** sin pruebas de componentes; la verificación es la compilación estricta de TypeScript en `npm run build` (ADR 0006).
-- **Rigor del compilador:** `TreatWarningsAsErrors` **solo** con `ContinuousIntegrationBuild=true`; `WarningsNotAsErrors NU1901;NU1902;NU1903;NU1904`. La regla de dependencias se comprueba con `dotnet list src/InvoiceReminders.Application package --include-transitive` (no debe contener `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`); hoy es una comprobación manual porque no hay CI (ADR 0009).
+- **Rigor del compilador:** `TreatWarningsAsErrors` **solo** con `ContinuousIntegrationBuild=true`; `WarningsNotAsErrors NU1901;NU1902;NU1903;NU1904`. La regla de dependencias se comprueba con `dotnet list src/InvoiceReminders.Application package --include-transitive` (no debe contener `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`); la ejecuta el trabajo `backend` del CI (`.github/workflows/ci.yml`) en cada push, junto con la compilación con `ContinuousIntegrationBuild=true` y `dotnet test` (ADR 0009).
 
 ## Alternativas consideradas
 
@@ -50,9 +53,9 @@ Positivas:
 
 Negativas y lo que se acepta a cambio:
 
-- La semántica CAS del doble no se verifica contra MongoDB real: si `MongoInvoiceRepository` divergiera, las pruebas unitarias no lo detectarían. Se mitiga con la guía manual (7 → 4 → 0 y escenario de SMTP caído); las pruebas con Testcontainers quedan como evolución.
-- Los adaptadores de Infrastructure (Mongo, MailKit, health checks) no tienen pruebas automatizadas.
-- `UnitTests` referencia `Infrastructure` solo para `DemoDataTests` y `DependencyInjectionTests`; las pruebas del caso de uso no tocan ningún tipo de Infrastructure.
+- La semántica CAS del doble no se verifica contra MongoDB real: si `MongoInvoiceRepository` divergiera, las pruebas unitarias no lo detectarían. Se mitiga con el trabajo `compose-smoke` del CI (7 → 4 → 0 contra MongoDB real) y la guía manual (incluido el escenario de SMTP caído); las pruebas con Testcontainers quedan como evolución.
+- Los adaptadores de Infrastructure (repositorios Mongo, envío MailKit, health checks) no tienen pruebas unitarias; de Infrastructure solo se prueban por unidad el mapeo `DocumentMappers` y la regla `IsDeliveryFailure`. El despliegue real lo recorre el trabajo `compose-smoke` del CI.
+- `UnitTests` referencia `Infrastructure` solo para `DemoDataTests`, `DependencyInjectionTests`, `DocumentMappersTests` y `MailKitEmailSenderTests`; las pruebas del caso de uso no tocan ningún tipo de Infrastructure.
 
 ## Referencias
 

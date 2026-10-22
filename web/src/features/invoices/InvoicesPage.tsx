@@ -1,85 +1,56 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError } from '../../api/client';
-import type { HealthReport, InvoiceFilter, InvoiceSummary, Meta, ReminderRunResult } from '../../api/types';
+import { useState } from 'react';
+import { api } from '../../api/client';
+import type { InvoiceFilter, ReminderRunResult } from '../../api/types';
 import { HealthChip } from '../health/HealthChip';
 import { RunResultPanel } from '../reminders/RunResultPanel';
 import { CustomerSummary } from './CustomerSummary';
 import { InvoiceFilters } from './InvoiceFilters';
 import { InvoiceTable } from './InvoiceTable';
 import { SummaryCards } from './SummaryCards';
+import { useInvoiceData } from './useInvoiceData';
+import { useMeta } from './useMeta';
+import { useOperation } from './useOperation';
 
 const NO_FILTER: InvoiceFilter = { customerId: '', status: '' };
 
-function messageOf(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  return 'No se pudo contactar la API. Verifique que el contenedor "app" esté en ejecución.';
+const RESET_CONFIRMATION =
+  '¿Restaurar los 3 clientes y las 10 facturas de demostración? Recuerde vaciar también la bandeja de Mailpit.';
+
+function describeRun(result: ReminderRunResult): string {
+  const base = `Ejecución terminada: ${result.emailsSent} correos enviados, ${result.updated} facturas actualizadas, ${result.failed} fallos.`;
+  if (result.completion === 'StoppedPersistenceUnavailable') return `${base} El lote se detuvo porque MongoDB no respondió.`;
+  if (result.completion === 'Cancelled') return `${base} La aplicación se estaba deteniendo.`;
+  return base;
 }
 
 export function InvoicesPage() {
   const [filter, setFilter] = useState<InvoiceFilter>(NO_FILTER);
-  const [summary, setSummary] = useState<InvoiceSummary | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [health, setHealth] = useState<HealthReport | null>(null);
   const [runResult, setRunResult] = useState<ReminderRunResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const refresh = useCallback(async (currentFilter: InvoiceFilter) => {
-    try {
-      const [nextSummary, nextHealth] = await Promise.all([api.getSummary(currentFilter), api.getHealth()]);
-      setSummary(nextSummary);
-      setHealth(nextHealth);
-      setError(null);
-    } catch (caught) {
-      setError(messageOf(caught));
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh(filter);
-  }, [filter, refresh]);
-
-  useEffect(() => {
-    api.getMeta().then(setMeta).catch((caught: unknown) => setError(messageOf(caught)));
-  }, []);
-
-  const runOperation = async (operation: () => Promise<void>) => {
-    setBusy(true);
-    setNotice(null);
-    try {
-      await operation();
-      await refresh(filter);
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 409) {
-        setNotice(caught.message);
-      } else {
-        setError(messageOf(caught));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { summary, health, error: loadError, reload } = useInvoiceData(filter);
+  const meta = useMeta();
+  const operation = useOperation(reload);
 
   const runReminders = (customerId?: string) =>
-    runOperation(async () => setRunResult(await api.runReminders(customerId)));
+    operation.run(async () => {
+      const result = await api.runReminders(customerId);
+      setRunResult(result);
+      return describeRun(result);
+    });
 
   const resetDemoData = () => {
-    const confirmed = window.confirm(
-      '¿Restaurar los 3 clientes y las 10 facturas de demostración? Recuerde vaciar también la bandeja de Mailpit.',
-    );
-    if (!confirmed) return;
-    void runOperation(async () => {
+    if (!window.confirm(RESET_CONFIRMATION)) return;
+    void operation.run(async () => {
       await api.resetDemoData();
       setRunResult(null);
-      setNotice('Datos de demostración restaurados.');
+      return 'Datos de demostración restaurados.';
     });
   };
 
+  const error = operation.error ?? loadError;
   const selectedCustomer = summary?.customers.find((customer) => customer.id === filter.customerId);
 
   return (
-    <main className="page">
+    <main className="page" aria-busy={operation.busy}>
       <header className="page__header">
         <div>
           <h1>Resumen de facturas</h1>
@@ -98,16 +69,18 @@ export function InvoicesPage() {
       {error && (
         <div className="alert alert--error" role="alert">
           {error}{' '}
-          <button type="button" className="link" onClick={() => void refresh(filter)}>
-            Reintentar
-          </button>
+          {error === loadError && (
+            <button type="button" className="link" onClick={reload}>
+              Reintentar
+            </button>
+          )}
         </div>
       )}
-      {notice && (
-        <div className="alert alert--info" role="status">
-          {notice}
-        </div>
-      )}
+
+      {/* Montada desde el inicio para que los lectores de pantalla anuncien cada resultado. */}
+      <div className={operation.notice ? 'alert alert--info' : 'sr-only'} role="status" aria-live="polite">
+        {operation.notice}
+      </div>
 
       {!summary ? (
         <p className="muted">Cargando facturas…</p>
@@ -116,26 +89,31 @@ export function InvoicesPage() {
           <SummaryCards summary={summary} />
           <CustomerSummary customers={summary.customers} />
 
-          <section className="panel">
+          <section className="panel" aria-labelledby="invoices-title">
             <div className="toolbar">
-              <InvoiceFilters filter={filter} customers={summary.customers} onChange={setFilter} />
+              <InvoiceFilters filter={filter} customers={summary.customers} disabled={operation.busy} onChange={setFilter} />
               <div className="actions">
-                <button type="button" className="button" disabled={busy} onClick={() => void runReminders()}>
-                  {busy ? 'Procesando…' : 'Ejecutar recordatorios (todos)'}
+                <button type="button" className="button" disabled={operation.busy} onClick={() => void runReminders()}>
+                  {operation.busy ? 'Procesando…' : 'Ejecutar recordatorios (todos)'}
                 </button>
                 {selectedCustomer && (
-                  <button type="button" className="button button--secondary" disabled={busy} onClick={() => void runReminders(selectedCustomer.id)}>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    disabled={operation.busy}
+                    onClick={() => void runReminders(selectedCustomer.id)}
+                  >
                     Ejecutar solo para {selectedCustomer.name}
                   </button>
                 )}
                 {meta?.allowReset && (
-                  <button type="button" className="button button--ghost" disabled={busy} onClick={resetDemoData}>
+                  <button type="button" className="button button--ghost" disabled={operation.busy} onClick={resetDemoData}>
                     Reiniciar datos de demostración
                   </button>
                 )}
               </div>
             </div>
-            <h2>Facturas ({summary.invoices.length})</h2>
+            <h2 id="invoices-title">Facturas ({summary.invoices.length})</h2>
             <InvoiceTable invoices={summary.invoices} />
           </section>
 
@@ -143,9 +121,7 @@ export function InvoicesPage() {
         </>
       )}
 
-      <footer className="muted footer">
-        {meta && `Versión ${meta.version} · entorno ${meta.environment}`}
-      </footer>
+      <footer className="muted footer">{meta && `Versión ${meta.version} · entorno ${meta.environment}`}</footer>
     </main>
   );
 }

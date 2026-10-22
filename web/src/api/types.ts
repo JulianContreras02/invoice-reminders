@@ -46,7 +46,6 @@ export interface InvoiceOutcome {
   invoiceId: string;
   customerId: string;
   customerName: string;
-  customerEmail: string;
   previousStatus: string;
   newStatus: string | null;
   kind: OutcomeKind;
