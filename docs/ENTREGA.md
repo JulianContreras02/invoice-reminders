@@ -119,7 +119,7 @@ Es el `dotnet test` clásico (VSTest), gracias a `xunit.v3.mtp-off` (variante of
 
 Resultado: 62 casos (48 métodos) en verde en unos 2 s, sin Docker ni red; compilación Release con `-p:ContinuousIntegrationBuild=true` sin advertencias. Estándares: `Directory.Build.props` con `AnalysisLevel latest` y `EnforceCodeStyleInBuild`; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true`; `.editorconfig`; async de punta a punta con `CancellationToken`; sin `catch` vacíos.
 
-CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit. [PENDIENTE FASE 4: enlace a la primera ejecución en verde.]
+CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit. Primera ejecución en verde, con los tres trabajos: https://github.com/JulianContreras02/invoice-reminders/actions/runs/39697939578
 
 ## 6. Progreso
 
@@ -127,7 +127,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 |---|---|---|
 | 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
 | 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
-| 3. Pruebas | 62 casos de prueba unitaria en verde; compilación estricta sin advertencias; arranque con configuración inválida verificado (código 1 y mensaje con la variable); guion completo automatizado en el CI | Parcial: [PENDIENTE FASE 3: primera ejecución del CI en GitHub, escenario SMTP caído en vivo] |
+| 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo local con MongoDB 8.0.34 y Mailpit 1.31.6 reales: historia 7 → 4 → 0, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
 | 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION, este documento | En curso: [PENDIENTE FASE 4: capturas, PDF y tag `v1.0.0`] |
 
 - Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. Los de lógica (CA-02 a CA-11, CA-15, CA-16) están cubiertos por pruebas unitarias; los de despliegue e interfaz (CA-01, CA-12, CA-13) los ejecuta el trabajo `compose-smoke` del CI. [PENDIENTE FASE 4: marcar cada uno tras la primera ejecución en verde y el ensayo manual con capturas.]
