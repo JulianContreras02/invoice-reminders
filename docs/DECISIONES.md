@@ -14,7 +14,7 @@ Convención de estados: **Propuesta** (en discusión), **Aceptada** (vigente), *
 | 0007 | [MailKit y Mailpit](adr/0007-mailkit-y-mailpit.md) | Aceptada | Transporte MailKit 4.18.1 y capturador Mailpit v1.31.6; sin emisor simulado; plantillas por interpolación con `HtmlEncode`. |
 | 0008 | [Estrategia de pruebas](adr/0008-estrategia-de-pruebas.md) | Aceptada | Un solo proyecto de pruebas unitarias con `xunit.v3.mtp-off` 4.0.2 (variante oficial de xunit.v3 sin Microsoft Testing Platform) y `dotnet test` clásico (VSTest); dobles escritos a mano en `Fakes/` (sin NSubstitute); sin Testcontainers ni pruebas de integración; warnings como errores solo con `ContinuousIntegrationBuild=true`. |
 | 0009 | [Despliegue con compose y semilla](adr/0009-despliegue-compose-y-semilla.md) | Aceptada | `docker compose up --build` con app + mongo + mailpit en loopback y sin `restart`; semilla opt-in en la aplicación (`MongoDemoDataSeeder`); CI en GitHub Actions que compila, prueba y ejecuta el guion del revisor contra el compose. |
-| 0010 | [Repositorio privado y confidencialidad](adr/0010-repositorio-privado-y-confidencialidad.md) | Aceptada | Repositorio privado con invitación a los revisores, nombre neutral, nunca el enunciado literal ni la empresa junto a la descripción de la prueba. |
+| 0010 | [Repositorio público y confidencialidad](adr/0010-repositorio-publico-y-confidencialidad.md) | Aceptada (revisada) | Repositorio público; la confidencialidad se garantiza por el contenido: nombre neutral, nunca el enunciado ni la empresa evaluadora, planeación interna fuera de git. Sustituye la decisión inicial de repositorio privado. |
 
 ## Supuestos que no son ADR
 

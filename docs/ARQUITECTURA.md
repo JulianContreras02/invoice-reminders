@@ -412,4 +412,4 @@ El índice de decisiones está en [DECISIONES.md](DECISIONES.md); cada ADR (una 
 | 0007 | MailKit + Mailpit v1.31.6; sin `LoggingEmailSender`; plantillas por interpolación con `HtmlEncode` |
 | 0008 | Un proyecto de pruebas unitarias: `xunit.v3.mtp-off` 4.0.2 (xunit.v3 sin Microsoft Testing Platform) con `dotnet test` clásico (VSTest); dobles escritos a mano (sin NSubstitute); sin Testcontainers; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true` |
 | 0009 | `docker compose` con app + mongo + mailpit, puertos en loopback, sin `restart`; semilla en la aplicación, opt-in; CI en GitHub Actions con compilación estricta, pruebas, regla de dependencias y prueba de humo del compose |
-| 0010 | Repositorio privado con invitación al equipo revisor; nombre neutral; sin el enunciado literal |
+| 0010 | Repositorio público; confidencialidad garantizada por el contenido (nombre neutral, sin el enunciado ni la empresa evaluadora) |

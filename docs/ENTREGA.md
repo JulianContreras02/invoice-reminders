@@ -16,7 +16,7 @@ EXPORTACIÓN A PDF (fase 4; se ensaya en la fase 1 con este borrador para no imp
 |---|---|
 | Autor | [PENDIENTE FASE 4: nombre del candidato] |
 | Fecha de entrega | [PENDIENTE FASE 4: fecha] |
-| Repositorio | [PENDIENTE FASE 4: URL del repositorio privado de GitHub; acceso por invitación al equipo revisor] |
+| Repositorio | https://github.com/JulianContreras02/invoice-reminders (público) |
 | Tag evaluado | `v1.0.0` [PENDIENTE FASE 4: confirmar el tag creado] |
 | Versiones | .NET 10 (LTS) · Node 22 (solo para desarrollo del frontend) · Docker Desktop · MongoDB 8.0 · Mailpit v1.31.6 |
 | Tiempo de lectura | [PENDIENTE FASE 4: estimar tras exportar] |
@@ -102,7 +102,7 @@ Cada ADR (contexto, decisión, alternativas, consecuencias) está en `docs/adr/`
 | [0007](adr/0007-mailkit-y-mailpit.md) | MailKit + Mailpit v1.31.6; sin emisor simulado; plantillas por interpolación con `HtmlEncode` | MailHog; `System.Net.Mail`; `LoggingEmailSender`; motor de plantillas | Mailpit mantenido (release semanal) con API REST; un emisor que simula éxito permitiría avanzar estados sin correo |
 | [0008](adr/0008-estrategia-de-pruebas.md) | Un proyecto de pruebas unitarias con `xunit.v3.mtp-off` 4.0.2 (xunit.v3 sin Microsoft Testing Platform) y `dotnet test` clásico (VSTest); dobles escritos a mano; sin Testcontainers; warnings como errores solo con `ContinuousIntegrationBuild=true` | xunit 2.9.3; NSubstitute; Microsoft.Testing.Platform; Testcontainers y suite de contrato | v2 deprecado en NuGet; proporcionalidad para una prueba técnica, menos dependencias y el doble del repositorio documenta el contrato del CAS |
 | [0009](adr/0009-despliegue-compose-y-semilla.md) | `docker compose` con app + mongo + mailpit, loopback, sin `restart`; semilla en la aplicación, opt-in; CI en GitHub Actions con compilación estricta, pruebas, regla de dependencias y prueba de humo del compose | Scripts `docker-entrypoint-initdb.d`; `restart: unless-stopped`; puertos abiertos | Mismo código de semilla en compose, F5, reinicio y pruebas; un error de configuración se ve en el log, no como bucle |
-| [0010](adr/0010-repositorio-privado-y-confidencialidad.md) | Repositorio privado con invitación; nombre neutral; sin el texto de la prueba | Público | Confidencialidad pactada |
+| [0010](adr/0010-repositorio-publico-y-confidencialidad.md) | Repositorio público; confidencialidad por contenido: nombre neutral, sin el texto de la prueba ni la empresa evaluadora | Privado con invitación (decisión inicial) | El contenido ya cumple la confidencialidad; el revisor accede y ve el CI sin pasos previos |
 
 ## 5. Calidad y pruebas
 
