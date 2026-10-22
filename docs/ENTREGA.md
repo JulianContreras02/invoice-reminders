@@ -114,7 +114,7 @@ Es el `dotnet test` clásico (VSTest), gracias a `xunit.v3.mtp-off` (variante of
 
 Resultado: 62 casos (48 métodos) en verde en unos 2 s, sin Docker ni red; compilación Release con `-p:ContinuousIntegrationBuild=true` sin advertencias. Estándares: `Directory.Build.props` con `AnalysisLevel latest` y `EnforceCodeStyleInBuild`; `TreatWarningsAsErrors` solo con `ContinuousIntegrationBuild=true`; `.editorconfig`; async de punta a punta con `CancellationToken`; sin `catch` vacíos.
 
-CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit. Primera ejecución en verde, con los tres trabajos: https://github.com/JulianContreras02/invoice-reminders/actions/runs/39697939578
+CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` compila con advertencias como errores, ejecuta las pruebas y verifica que Application no arrastra `MongoDB`, `MailKit`, `MimeKit` ni `Microsoft.AspNetCore`. `frontend` ejecuta `npm ci` y `npm run build`. `compose-smoke` descarga las imágenes y construye con reintentos, levanta el docker compose real y ejecuta `.github/scripts/compose-smoke.sh`, que reproduce la secuencia de 7, 4 y 0 correos contra la API y la bandeja de Mailpit. Primera ejecución en verde, con los tres trabajos: https://github.com/JulianContreras02/invoice-reminders/actions/runs/39697939578
 
 ## 6. Progreso
 
@@ -134,7 +134,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
   - **Dependencia transitiva con avisos de seguridad.** MimeKit 4.18.1 trae `System.Security.Cryptography.Pkcs` 10.0.0 (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). Se fijó a 10.0.13 con Central Package Management en lugar de silenciar el aviso.
   - **Comentario XML inválido.** Un comentario en `Directory.Build.props` contenía dos guiones seguidos y MSBuild no podía cargar el archivo; se reescribió.
   - **Arranque ordenado con Mailpit.** Se comprobó en el Dockerfile oficial de Mailpit que su imagen declara un `HEALTHCHECK`, y la aplicación espera con `service_healthy` para que el indicador de salud arranque en verde.
-  - **Entorno sin Docker.** El equipo de desarrollo no tenía Docker; por eso el CI levanta el compose real y ejecuta las verificaciones de la guía en cada push.
+  - **Fallos pasajeros al descargar imágenes.** Dos ejecuciones del CI fallaron al levantar el compose en commits que solo cambiaban documentación. Al reproducirlo se vio que la causa era la red al descargar imágenes de Docker Hub. El trabajo ahora descarga y construye con hasta tres intentos, corre en `ubuntu-24.04` fijo y, si algo falla, muestra los logs de todos los contenedores.
   - **Revisión interna del proceso.** Se detectó que un apagado durante un envío perdía el resultado del lote, que un fallo al cerrar la conexión SMTP podía duplicar correos y que con MongoDB caído el lote seguía enviando. Se corrigió con `RunCompletion`, la factura como unidad de trabajo (envío y actualización sin token cancelable; el correo cuenta como entregado en cuanto el servidor lo acepta) y el corte del lote con `StoppedPersistenceUnavailable`, con pruebas para cada caso.
 
 ## 7. Guía de verificación

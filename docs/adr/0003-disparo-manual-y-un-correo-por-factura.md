@@ -8,7 +8,7 @@ El proceso de recordatorios toma las facturas de un cliente en `primerrecordator
 
 Restricciones que pesan en la decisión:
 
-- El guion del revisor es clonar, `docker compose up --build`, abrir la UI y ver 10 facturas de 3 clientes **con la semilla intacta**, pulsar "Ejecutar recordatorios" y comprobar el antes y el después (7 correos, luego 4, luego 0).
+- Lo que hace el revisor es clonar, `docker compose up --build`, abrir la UI y ver 10 facturas de 3 clientes **con la semilla intacta**, pulsar "Ejecutar recordatorios" y comprobar el antes y el después (7 correos, luego 4, luego 0).
 - Los criterios de aceptación piden un paso por ejecución (CA-10) y que cada cliente reciba únicamente los correos de sus facturas (CA-11).
 - El proceso debe servir tanto para un cliente concreto como para todos.
 
@@ -32,7 +32,7 @@ Restricciones que pesan en la decisión:
 
 Positivas:
 
-- Demo determinista y repetible: la historia 7 → 4 → 0 se narra en `docs/VERIFICACION.md` y se afirma en `DemoDataTests` (caso de uso real sobre los dobles en memoria con la semilla real).
+- Demo determinista y repetible: la secuencia de 7, 4 y 0 correos se narra en `docs/VERIFICACION.md` y se afirma en `DemoDataTests` (caso de uso real sobre los dobles en memoria con la semilla real).
 - Trazabilidad completa: cada correo lleva `Message-ID` determinista `{numeroFactura}.{estadoAnterior}.{runId sin guiones}@invoice-reminders.test` (guardado sin corchetes angulares) y cabeceras `X-Invoice-Id`, `X-Reminder-Kind`, `X-Reminder-Run-Id`, y corresponde a una entrada de `historialEstados`.
 - La regla "sin envío no hay cambio" es trivial de implementar y de probar por unidad (ADR 0004).
 - Cambiar a disparo programado o a consolidación no toca `ReminderPolicy` ni los puertos: es otra forma de invocar el mismo caso de uso.

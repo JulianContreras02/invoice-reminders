@@ -62,7 +62,7 @@ Si ya hay una ejecución o un reinicio en curso, la API responde `409` ("Operaci
 ## Reiniciar los datos (y vaciar Mailpit)
 
 - Botón **Reiniciar datos de demostración** en la interfaz, o `POST http://localhost:8080/api/admin/seed/reset` (responde `403` si `Seed__AllowReset=false`).
-- El reinicio restaura MongoDB pero **no** vacía Mailpit. Para repetir la historia 7 → 4 → 0 vacíe la bandeja con el botón *Delete all* de Mailpit o:
+- El reinicio restaura MongoDB pero **no** vacía Mailpit. Para repetir la secuencia de 7, 4 y 0 correos vacíe la bandeja con el botón *Delete all* de Mailpit o:
 
 ```bash
 curl -X DELETE http://localhost:8025/api/v1/messages

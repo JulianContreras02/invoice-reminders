@@ -4,7 +4,7 @@
 
 ## Contexto
 
-El guion del revisor es: clonar, ejecutar un único comando, abrir la UI y ver 3 clientes con 10 facturas sin intervención manual (CA-13). El requisito previo debe ser solo Docker Desktop: ni .NET ni Node. La demo corre sin autenticación en Mongo ni en Mailpit, en la máquina del revisor. Un error de configuración debe ser visible en el log, no un bucle de reinicios.
+Lo que hace el revisor es: clonar, ejecutar un único comando, abrir la UI y ver 3 clientes con 10 facturas sin intervención manual (CA-13). El requisito previo debe ser solo Docker Desktop: ni .NET ni Node. La demo corre sin autenticación en Mongo ni en Mailpit, en la máquina del revisor. Un error de configuración debe ser visible en el log, no un bucle de reinicios.
 
 Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API local), en el endpoint de reinicio y en las pruebas, y nunca debe sembrar un entorno real por accidente.
 
@@ -19,7 +19,7 @@ Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API
 - **Opt-in:** `SeedOptions { Mode = Never, AllowReset = false }` por defecto; `Seed__Mode: IfEmpty` y `Seed__AllowReset: "true"` solo en compose y en `appsettings.Development.json`. `POST /api/admin/seed/reset` (modo `Always`: borra e inserta los mismos `_id`) responde 403 si `AllowReset=false` y usa el token de apagado de la aplicación, no el de la petición, como `POST /api/reminders/run`.
 - Variables de `app` en compose: `Mongo__ConnectionString: mongodb://mongo:27017`, `Mongo__Database: invoice_reminders`, `Smtp__Host: mailpit`, `Smtp__Port: "1025"`, `Smtp__Security: None`, `Smtp__FromAddress`, `Smtp__FromName`, `Links__MailpitUrl`.
 - No hay `docker-compose.vs.yml` ni `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose en Visual Studio queda como evolución; hoy se depura la API local con `docker compose up -d mongo mailpit`. Un `docker-compose.override.yml` generado por el asistente de Visual Studio está en `.gitignore`.
-- **CI en GitHub Actions** (`.github/workflows/ci.yml`) en cada push y pull request a `main`: `backend` compila con `ContinuousIntegrationBuild=true`, ejecuta `dotnet test` y comprueba con `dotnet list` que Application no depende de paquetes de infraestructura; `frontend` ejecuta `npm ci` y `npm run build`; `compose-smoke` hace `docker compose up -d --build --wait` y ejecuta `.github/scripts/compose-smoke.sh`, que comprueba salud, 10 facturas de 3 clientes, la historia 7 → 4 → 0 contra la API y la bandeja de Mailpit, el reinicio de datos, el 404 de `/api/*`, la SPA y el documento OpenAPI. No añade pasos al revisor; el mismo script sirve en local con Docker.
+- **CI en GitHub Actions** (`.github/workflows/ci.yml`) en cada push y pull request a `main`: `backend` compila con `ContinuousIntegrationBuild=true`, ejecuta `dotnet test` y comprueba con `dotnet list` que Application no depende de paquetes de infraestructura; `frontend` ejecuta `npm ci` y `npm run build`; `compose-smoke` descarga las imágenes y construye con hasta tres intentos, para que un fallo pasajero de red al descargar de Docker Hub no marque como roto un despliegue que funciona; después hace `docker compose up -d --wait` y ejecuta `.github/scripts/compose-smoke.sh`, que comprueba salud, 10 facturas de 3 clientes, la secuencia de 7, 4 y 0 correos contra la API y la bandeja de Mailpit, el reinicio de datos, el 404 de `/api/*`, la SPA y el documento OpenAPI. Si algo falla, muestra el estado y los logs de todos los contenedores. Los tres trabajos corren en `ubuntu-24.04` fijo, no en `ubuntu-latest`, para que un cambio de imagen del proveedor no altere el resultado. No añade pasos al revisor; el mismo script sirve en local con Docker.
 
 ## Alternativas consideradas
 
@@ -38,7 +38,7 @@ Positivas:
 - El mismo código de semilla sirve en compose, F5, reinicio y pruebas, y funciona aunque el volumen ya exista.
 - Un fallo de configuración se diagnostica con `docker compose logs app` en una línea.
 - El build del revisor no depende de `tests/`, de la `.slnx` ni de warnings nuevos.
-- La historia 7 → 4 → 0 es reproducible con "Reiniciar datos" más vaciar Mailpit.
+- La secuencia de 7, 4 y 0 correos es reproducible con "Reiniciar datos" más vaciar Mailpit.
 
 Negativas y lo que se acepta a cambio:
 
@@ -52,5 +52,5 @@ Negativas y lo que se acepta a cambio:
 
 - `docs/ARQUITECTURA.md`: diagrama de contenedores.
 - `README.md`: inicio rápido, tabla de URLs, variables de entorno y troubleshooting.
-- `docs/VERIFICACION.md`: guion del revisor.
+- `docs/VERIFICACION.md`: guía de verificación para el revisor.
 - ADR 0001 (imágenes base), ADR 0007 (Mailpit) y ADR 0008 (pruebas y rigor del compilador).

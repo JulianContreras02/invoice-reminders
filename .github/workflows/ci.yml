@@ -1,4 +1,4 @@
-# Integración continua: compila y prueba backend y frontend, y ejecuta el guion del revisor
+# Integración continua: compila y prueba backend y frontend, y recorre la guía de verificación
 # contra el docker compose real (MongoDB + Mailpit) en una máquina limpia de GitHub.
 name: CI
 
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (.NET 10)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -53,7 +53,7 @@ jobs:
 
   frontend:
     name: Frontend (React + Vite)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
@@ -74,20 +74,45 @@ jobs:
 
   compose-smoke:
     name: Despliegue con docker compose
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v7
 
-      - name: Levantar app, MongoDB y Mailpit
-        run: docker compose up -d --build --wait --wait-timeout 300
+      # Docker Hub y los registros de paquetes fallan a veces por problemas de red pasajeros
+      # (resolución de nombres, cortes de conexión). Descargar y construir con reintentos evita
+      # que un fallo de red marque como roto un despliegue que funciona.
+      - name: Descargar imágenes y construir (con reintentos)
+        run: |
+          retry() {
+            local attempt=1
+            until "$@"; do
+              if [ "$attempt" -ge 3 ]; then
+                echo "::error::Falló tras 3 intentos: $*"
+                return 1
+              fi
+              echo "::warning::Intento $attempt falló: $*. Reintento en $((attempt * 15)) s."
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+            done
+          }
+          retry docker compose pull --ignore-buildable
+          for image in node:22-alpine mcr.microsoft.com/dotnet/sdk:10.0 mcr.microsoft.com/dotnet/aspnet:10.0; do
+            retry docker pull "$image"
+          done
+          retry docker compose build
 
-      - name: Guion del revisor (7, 4 y 0 correos)
+      - name: Levantar app, MongoDB y Mailpit
+        run: docker compose up -d --wait --wait-timeout 300
+
+      - name: Verificación de la guía (7, 4 y 0 correos)
         run: bash .github/scripts/compose-smoke.sh
 
-      - name: Logs de la aplicación
+      - name: Diagnóstico de los contenedores
         if: failure()
-        run: docker compose logs app
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color
 
       - name: Apagar
         if: always()
