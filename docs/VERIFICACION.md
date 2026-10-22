@@ -12,9 +12,9 @@ Solo **Docker Desktop** (con WSL2 en Windows). No hace falta .NET, Node ni Visua
 
 ## 2. Arranque con un comando
 
-Desde la raíz del clon:
-
-```
+```bash
+git clone https://github.com/JulianContreras02/invoice-reminders.git
+cd invoice-reminders
 docker compose up --build
 ```
 

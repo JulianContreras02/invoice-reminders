@@ -19,7 +19,7 @@ Más capturas en la [guía de verificación](docs/VERIFICACION.md). El documento
 ## Inicio rápido
 
 ```bash
-git clone <url-del-repositorio> invoice-reminders
+git clone https://github.com/JulianContreras02/invoice-reminders.git
 cd invoice-reminders
 docker compose up --build
 ```

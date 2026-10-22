@@ -15,9 +15,8 @@ ningún marcador PENDIENTE, ninguna afirmación sin respaldo en el código del t
 | Repositorio | https://github.com/JulianContreras02/invoice-reminders (público) |
 | Tag evaluado | `v1.0.0` |
 | Versiones | .NET 10 (LTS) · Node 22 (solo para desarrollo del frontend) · Docker Desktop · MongoDB 8.0 · Mailpit v1.31.6 |
-| Tiempo de lectura | Unos 20 minutos; 8 si solo se leen las secciones 1, 3 y 7 |
 
-Este documento es narrativo: qué se construyó, por qué, cómo se verificó y qué sigue. El detalle operativo (comandos, variables, troubleshooting) está en el `README.md` del repositorio; aquí solo se incluye el camino feliz de tres pasos.
+Este documento explica qué se construyó, por qué, cómo se verificó y qué sigue. Los comandos, las variables de entorno y la solución de problemas están en el `README.md` del repositorio; aquí solo se incluyen los pasos para levantar y probar el sistema.
 
 ## 1. Resumen ejecutivo
 
@@ -123,7 +122,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 |---|---|---|
 | 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
 | 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
-| 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo local con MongoDB 8.0.34 y Mailpit 1.31.6 reales: historia 7 → 4 → 0, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
+| 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo local con MongoDB 8.0.34 y Mailpit 1.31.6 reales: secuencia de 7, 4 y 0 correos, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
 | 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION con capturas reales, este documento en PDF, tag `v1.0.0` | Completa |
 
 - Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. 16 de 17 están verificados: los de lógica (CA-02 a CA-11, CA-15, CA-16) con pruebas unitarias y con el ensayo contra MongoDB y Mailpit reales; los de despliegue e interfaz (CA-01, CA-12, CA-13) con el trabajo `compose-smoke` del CI y las capturas; CA-01 también en su camino negativo (sin MongoDB, 15 reintentos y salida con código 1 en unos 105 s). CA-14 compila y se prueba con el SDK 10.0.402 y en el CI; abrir la solución en Visual Studio 2026 es la verificación que falta.
@@ -135,7 +134,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
   - **Dependencia transitiva con avisos de seguridad.** MimeKit 4.18.1 trae `System.Security.Cryptography.Pkcs` 10.0.0 (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). Se fijó a 10.0.13 con Central Package Management en lugar de silenciar el aviso.
   - **Comentario XML inválido.** Un comentario en `Directory.Build.props` contenía dos guiones seguidos y MSBuild no podía cargar el archivo; se reescribió.
   - **Arranque ordenado con Mailpit.** Se comprobó en el Dockerfile oficial de Mailpit que su imagen declara un `HEALTHCHECK`, y la aplicación espera con `service_healthy` para que el indicador de salud arranque en verde.
-  - **Entorno sin Docker.** El equipo de desarrollo no tenía Docker; por eso el CI levanta el compose real y ejecuta el guion del revisor en cada push.
+  - **Entorno sin Docker.** El equipo de desarrollo no tenía Docker; por eso el CI levanta el compose real y ejecuta las verificaciones de la guía en cada push.
   - **Revisión interna del proceso.** Se detectó que un apagado durante un envío perdía el resultado del lote, que un fallo al cerrar la conexión SMTP podía duplicar correos y que con MongoDB caído el lote seguía enviando. Se corrigió con `RunCompletion`, la factura como unidad de trabajo (envío y actualización sin token cancelable; el correo cuenta como entregado en cuanto el servidor lo acepta) y el corte del lote con `StoppedPersistenceUnavailable`, con pruebas para cada caso.
 
 ## 7. Guía de verificación
@@ -145,7 +144,7 @@ Requisito previo único: Docker Desktop. No hace falta .NET ni Node.
 **Paso 1 — Levantar.**
 
 ```bash
-git clone <url-del-repositorio> invoice-reminders && cd invoice-reminders
+git clone https://github.com/JulianContreras02/invoice-reminders.git && cd invoice-reminders
 docker compose up --build
 ```
 
@@ -169,7 +168,7 @@ Ejecute otra vez: las mismas facturas se procesan y los correos aparecen en Mail
 
 **Repetir la demo:** botón **Reiniciar datos de demostración** **y** vaciar Mailpit (*Delete all* en su interfaz o `DELETE http://localhost:8025/api/v1/messages`); si no se vacía, los correos se acumulan (7 + 4 + 7).
 
-**Troubleshooting (detalle en el README):** puerto ocupado → `.env` con `APP_PORT`/`MAILPIT_PORT`/`SMTP_PORT`/`MONGO_PORT`; Docker sin memoria o WSL2 → asignar memoria y reiniciar Docker Desktop; proxy corporativo → configurar proxy en Docker Desktop para npm y NuGet; `app` en `Exited` → `docker compose logs app`, la última línea nombra la causa; CPU x86 sin AVX → MongoDB ≥ 5.0 no arranca; no hay tag alternativo, usar otra máquina o VM con AVX.
+**Solución de problemas (detalle en el README):** puerto ocupado → `.env` con `APP_PORT`/`MAILPIT_PORT`/`SMTP_PORT`/`MONGO_PORT`; Docker sin memoria o WSL2 → asignar memoria y reiniciar Docker Desktop; proxy corporativo → configurar proxy en Docker Desktop para npm y NuGet; `app` en `Exited` → `docker compose logs app`, la última línea nombra la causa; CPU x86 sin AVX → MongoDB ≥ 5.0 no arranca; no hay tag alternativo, usar otra máquina o VM con AVX.
 
 ## 8. Pasos a seguir y evolución
 
