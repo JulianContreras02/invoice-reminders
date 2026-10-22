@@ -10,7 +10,7 @@ Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API
 
 ## Decisión
 
-- **Comando único:** `docker compose up --build` desde la raíz. `docker-compose.yml` es canónico y autosuficiente con tres servicios: `mongo` (`mongo:8.0`), `mailpit` (`axllent/mailpit:v1.31.6`) y `app` (imagen `invoice-reminders-app:local`). URLs: UI `http://localhost:8080`, documentación de la API `/scalar` (OpenAPI en `/openapi/v1.json`), salud `/health/ready`, correos `http://localhost:8025`. Borrado total: `docker compose down -v`; diagnóstico: `docker compose logs app`.
+- **Comando único:** `docker compose up --build` desde la raíz. `docker-compose.yml` es canónico y autosuficiente con tres servicios: `mongo` (`mongo:7.0`), `mailpit` (`axllent/mailpit:v1.31.6`) y `app` (imagen `invoice-reminders-app:local`). URLs: UI `http://localhost:8080`, documentación de la API `/scalar` (OpenAPI en `/openapi/v1.json`), salud `/health/ready`, correos `http://localhost:8025`. Borrado total: `docker compose down -v`; diagnóstico: `docker compose logs app`.
 - **Puertos en loopback:** `127.0.0.1:${APP_PORT:-8080}:8080`, `127.0.0.1:${MAILPIT_PORT:-8025}:8025`, `127.0.0.1:${SMTP_PORT:-1025}:1025`, `127.0.0.1:${MONGO_PORT:-27017}:27017`. `.env.example` con esas cuatro variables es lo único que el revisor tocaría si un puerto está ocupado.
 - **Sin `restart`** en `app`: con configuración inválida el contenedor sale con código ≠ 0 y se queda parado para que la causa aparezca en la última línea del log.
 - `depends_on`: `mongo` con `condition: service_healthy` (healthcheck con `mongosh` y `db.adminCommand('ping').ok`); `mailpit` también con `service_healthy` (su imagen declara `HEALTHCHECK` con `/mailpit readyz`). Healthcheck de `app` con `bash -c '</dev/tcp/127.0.0.1/8080'` (sin `apt-get` ni `curl`).
@@ -21,7 +21,11 @@ Además, la misma semilla debe servir en compose, en F5 desde Visual Studio (API
 - No hay `docker-compose.vs.yml` ni `docker-compose.dcproj`: depurar con F5 dentro de Docker Compose en Visual Studio queda como evolución; hoy se depura la API local con `docker compose up -d mongo mailpit`. Un `docker-compose.override.yml` generado por el asistente de Visual Studio está en `.gitignore`.
 - **CI en GitHub Actions** (`.github/workflows/ci.yml`) en cada push y pull request a `main`: `backend` compila con `ContinuousIntegrationBuild=true`, ejecuta `dotnet test` y comprueba con `dotnet list` que Application no depende de paquetes de infraestructura; `frontend` ejecuta `npm ci` y `npm run build`; `compose-smoke` descarga las imágenes y construye con hasta tres intentos, para que un fallo pasajero de red al descargar de Docker Hub no marque como roto un despliegue que funciona; después hace `docker compose up -d --wait` y ejecuta `.github/scripts/compose-smoke.sh`, que comprueba salud, 10 facturas de 3 clientes, la secuencia de 7, 4 y 0 correos contra la API y la bandeja de Mailpit, el reinicio de datos, el 404 de `/api/*`, la SPA y el documento OpenAPI. Si algo falla, muestra el estado y los logs de todos los contenedores. Los tres trabajos corren en `ubuntu-24.04` fijo, no en `ubuntu-latest`, para que un cambio de imagen del proveedor no altere el resultado. No añade pasos al revisor; el mismo script sirve en local con Docker.
 
+- **MongoDB 7.0** (`mongo:7.0`, soporte hasta agosto de 2027). MongoDB 8 se niega a arrancar en kernels Linux 6.19 o superiores (SERVER-121912). Docker comparte el kernel del equipo anfitrión, así que con 8.x el contenedor fallaría en cualquier máquina con un kernel reciente, incluidas las de GitHub Actions y potencialmente la del revisor. La aplicación no usa nada exclusivo de 8.x, y MongoDB.Driver 3.12.0 soporta servidores 4.4 y posteriores.
+
 ## Alternativas consideradas
+
+- **`mongo:8.0`** (decisión inicial). Se descartó cuando el CI empezó a fallar de forma intermitente al arrancar MongoDB en las máquinas de GitHub con kernel nuevo. Fijar la máquina de CI a un kernel antiguo solo aplazaría el problema y no protege al revisor.
 
 - **Scripts en `docker-entrypoint-initdb.d` de la imagen de Mongo.** Solo corren con el volumen vacío, no sirven para F5 ni para el endpoint de reinicio, y duplican el conocimiento del esquema fuera del código. Descartados.
 - **`restart: unless-stopped`.** Ocultaría errores de configuración tras un bucle de `Restarting`. Descartado.
@@ -44,8 +48,8 @@ Negativas y lo que se acepta a cambio:
 
 - Primer build de 3-6 minutos; los siguientes tardan segundos. Se ensaya en un clon limpio sin .NET ni Node antes de entregar.
 - Mongo ≥ 5.0 exige AVX en x86-64: no se promete un tag alternativo; se documenta en el troubleshooting del README.
-- La compatibilidad MongoDB.Driver 3.12.0 con servidor 8.0 se verifica en cada push con el trabajo `compose-smoke` del CI (misma imagen `mongo:8.0` que usa el revisor) y con la guía manual de `docs/VERIFICACION.md`; no hay pruebas de integración con Testcontainers.
-- Imágenes con tag de versión menor (`sdk:10.0`, `aspnet:10.0`, `node:22-alpine`, `mongo:8.0`) para recibir parches; Mailpit fijado a `v1.31.6`.
+- La compatibilidad MongoDB.Driver 3.12.0 con servidor 7.0 se verifica en cada push con el trabajo `compose-smoke` del CI (misma imagen `mongo:7.0` que usa el revisor) y con la guía manual de `docs/VERIFICACION.md`; no hay pruebas de integración con Testcontainers.
+- Imágenes con tag de versión menor (`sdk:10.0`, `aspnet:10.0`, `node:22-alpine`, `mongo:7.0`) para recibir parches; Mailpit fijado a `v1.31.6`.
 - Sin autenticación en la demo: decisión declarada como "solo demo local".
 
 ## Referencias

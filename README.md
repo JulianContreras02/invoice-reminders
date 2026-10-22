@@ -179,4 +179,4 @@ invoice-reminders/
 | Proxy corporativo: falla `npm install` (o `npm ci`) o `dotnet restore` dentro del build | Configure el proxy en Docker Desktop (Settings > Resources > Proxies) y, si aplica, los certificados de la empresa. |
 | El contenedor `app` termina (`Exited`) | `docker compose logs app`: la última línea nombra la causa (variable faltante o inválida, MongoDB inaccesible, error al sembrar). No hay `restart`, por lo que el error no se oculta en un bucle. |
 | La interfaz no refleja un cambio tras actualizar la imagen | El navegador cacheó la SPA: recargue sin caché (Ctrl+F5). |
-| `mongo` se reinicia o muere al instante en un equipo x86 antiguo o una VM | MongoDB 5.0 y posteriores exigen AVX en x86-64 (`mongo:8.0` incluido). No hay tag alternativo soportado: use otra máquina o habilite AVX en la VM. ARM64/Apple Silicon no se ve afectado. |
+| `mongo` se reinicia o muere al instante en un equipo x86 antiguo o una VM | MongoDB 5.0 y posteriores exigen AVX en x86-64 (`mongo:7.0` incluido). No hay tag alternativo soportado: use otra máquina o habilite AVX en la VM. ARM64/Apple Silicon no se ve afectado. |

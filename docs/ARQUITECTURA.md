@@ -1,6 +1,6 @@
 # Arquitectura — `invoice-reminders`
 
-**Proyecto:** sistema de recordatorios de cobro sobre facturas en MongoDB (prueba técnica) · **Fecha:** 2026-10-21 · **Stack:** .NET 10 · React 19 + Vite 8 · MongoDB 8.0 · Mailpit
+**Proyecto:** sistema de recordatorios de cobro sobre facturas en MongoDB (prueba técnica) · **Fecha:** 2026-10-21 · **Stack:** .NET 10 · React 19 + Vite 8 · MongoDB 7.0 · Mailpit
 
 Este documento describe la arquitectura del sistema tal como se construye: capas, diagramas (componentes, estados, secuencia), modelo de datos, plantillas de correo, API y mapa de inyección de dependencias. Las decisiones que la sustentan están en [DECISIONES.md](DECISIONES.md) (índice de los ADR 0001 a 0010, sección 14). El README es el documento operativo; la guía paso a paso del equipo revisor es [VERIFICACION.md](VERIFICACION.md).
 
@@ -38,7 +38,7 @@ flowchart LR
     DOM[Domain<br/>Invoice · Customer · InvoiceStatus · ReminderPolicy]
     INF[Infrastructure<br/>MongoInvoiceRepository · MongoInvoiceSummaryQueries<br/>MailKitEmailSender · MongoDemoDataSeeder · HealthChecks]
   end
-  MONGO[(mongo:8.0<br/>clientes · facturas)]
+  MONGO[(mongo:7.0<br/>clientes · facturas)]
   MAIL[axllent/mailpit<br/>SMTP 1025 · UI 8025]
 
   UI -- "HTTP /api" --> API
@@ -54,7 +54,7 @@ flowchart LR
 | Contenedor | Imagen | Función | Puertos (solo loopback) |
 |---|---|---|---|
 | `app` | `invoice-reminders-app:local`, construida desde `src/InvoiceReminders.Api/Dockerfile` (multi-stage: `base` aspnet → `web` node → `build` sdk → `final FROM base`) | API Minimal + SPA React servida desde `wwwroot` + semilla al arrancar. Sin `restart`: si la configuración es inválida termina y `docker compose logs app` muestra la causa. | `127.0.0.1:8080` |
-| `mongo` | `mongo:8.0` | Base `invoice_reminders` con `clientes` y `facturas`; volumen `mongo_data`; healthcheck con `mongosh` `ping`. | `127.0.0.1:27017` (opcional, para Compass) |
+| `mongo` | `mongo:7.0` | Base `invoice_reminders` con `clientes` y `facturas`; volumen `mongo_data`; healthcheck con `mongosh` `ping`. | `127.0.0.1:27017` (opcional, para Compass) |
 | `mailpit` | `axllent/mailpit:v1.31.6` | Capturador SMTP para la demo: recibe en 1025, muestra en 8025, API REST `/api/v1/messages`. Sin autenticación SMTP. | `127.0.0.1:8025`, `127.0.0.1:1025` |
 
 `app` declara `depends_on` con `condition: service_healthy` para `mongo` (healthcheck con `mongosh`) y para `mailpit` (su imagen declara `HEALTHCHECK` con `/mailpit readyz`), así `/health/ready` arranca en verde. Los puertos se publican solo en `127.0.0.1` por higiene (Mongo y Mailpit sin autenticación no se exponen a la red local); `.env.example` permite cambiarlos (`APP_PORT`, `MAILPIT_PORT`, `SMTP_PORT`, `MONGO_PORT`). Imágenes base: `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04, no alpine: las variantes alpine activan `InvariantGlobalization` y rompen `es-CO`), `mcr.microsoft.com/dotnet/sdk:10.0` y `node:22-alpine`. Se usan tags de versión menor (`10.0`, `22-alpine`, `8.0`) para recibir parches de seguridad; Mailpit va fijado a `v1.31.6`.

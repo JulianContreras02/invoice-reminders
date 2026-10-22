@@ -14,7 +14,7 @@ ningún marcador PENDIENTE, ninguna afirmación sin respaldo en el código del t
 | Fecha de entrega | 21 de octubre de 2026 |
 | Repositorio | https://github.com/JulianContreras02/invoice-reminders (público) |
 | Tag evaluado | `v1.0.0` |
-| Versiones | .NET 10 (LTS) · Node 22 (solo para desarrollo del frontend) · Docker Desktop · MongoDB 8.0 · Mailpit v1.31.6 |
+| Versiones | .NET 10 (LTS) · Node 22 (solo para desarrollo del frontend) · Docker Desktop · MongoDB 7.0 · Mailpit v1.31.6 |
 
 Este documento explica qué se construyó, por qué, cómo se verificó y qué sigue. Los comandos, las variables de entorno y la solución de problemas están en el `README.md` del repositorio; aquí solo se incluyen los pasos para levantar y probar el sistema.
 
@@ -122,7 +122,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
 |---|---|---|
 | 1. Planeación | Lectura de requisitos y supuestos, 10 decisiones confirmadas como ADR, esquema y semilla, plantillas de correo, estructura de la solución | Completa |
 | 2. Desarrollo | Domain → Application + pruebas unitarias → Infrastructure (MongoDB, MailKit, semilla, salud) → Api → Frontend → Docker → CI | Completa |
-| 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo local con MongoDB 8.0.34 y Mailpit 1.31.6 reales: secuencia de 7, 4 y 0 correos, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
+| 3. Pruebas | 62 pruebas unitarias en verde; compilación estricta sin advertencias; CI en verde en GitHub (backend, frontend y docker compose real); ensayo con el docker compose final (MongoDB 7.0 y Mailpit 1.31.6) desde un clon limpio: secuencia de 7, 4 y 0 correos, contenido y cabeceras de los correos, reinicio de datos y escenario SMTP caído (7 `EmailFailed`, estados intactos, recuperación al volver Mailpit) | Completa |
 | 4. Entrega | README, ARQUITECTURA, ADR definitivos, VERIFICACION con capturas reales, este documento en PDF, tag `v1.0.0` | Completa |
 
 - Estado por requisito: los criterios de aceptación CA-01 a CA-17 están en `docs/VERIFICACION.md`. 16 de 17 están verificados: los de lógica (CA-02 a CA-11, CA-15, CA-16) con pruebas unitarias y con el ensayo contra MongoDB y Mailpit reales; los de despliegue e interfaz (CA-01, CA-12, CA-13) con el trabajo `compose-smoke` del CI y las capturas; CA-01 también en su camino negativo (sin MongoDB, 15 reintentos y salida con código 1 en unos 105 s). CA-14 compila y se prueba con el SDK 10.0.402 y en el CI; abrir la solución en Visual Studio 2026 es la verificación que falta.
@@ -134,7 +134,7 @@ CI: `.github/workflows/ci.yml` en GitHub Actions con tres trabajos. `backend` co
   - **Dependencia transitiva con avisos de seguridad.** MimeKit 4.18.1 trae `System.Security.Cryptography.Pkcs` 10.0.0 (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). Se fijó a 10.0.13 con Central Package Management en lugar de silenciar el aviso.
   - **Comentario XML inválido.** Un comentario en `Directory.Build.props` contenía dos guiones seguidos y MSBuild no podía cargar el archivo; se reescribió.
   - **Arranque ordenado con Mailpit.** Se comprobó en el Dockerfile oficial de Mailpit que su imagen declara un `HEALTHCHECK`, y la aplicación espera con `service_healthy` para que el indicador de salud arranque en verde.
-  - **Fallos pasajeros al descargar imágenes.** Dos ejecuciones del CI fallaron al levantar el compose en commits que solo cambiaban documentación. Al reproducirlo se vio que la causa era la red al descargar imágenes de Docker Hub. El trabajo ahora descarga y construye con hasta tres intentos, corre en `ubuntu-24.04` fijo y, si algo falla, muestra los logs de todos los contenedores.
+  - **MongoDB 8 y los kernels de Linux recientes.** Tres ejecuciones del CI fallaron al levantar el compose en commits que solo cambiaban documentación. Las anotaciones del trabajo mostraron que el contenedor de MongoDB terminaba con código 1 al arrancar. La causa es una verificación de MongoDB 8: se niega a correr en kernels Linux 6.19 o superiores (SERVER-121912), y GitHub está desplegando máquinas con un kernel así por oleadas, por eso fallaba solo a veces. Como Docker usa el kernel del equipo anfitrión, al revisor le podía pasar lo mismo. Se cambió a `mongo:7.0`, que no tiene esa restricción y tiene soporte hasta 2027. Además, el CI descarga y construye con reintentos y deja las últimas líneas de cada contenedor como anotación visible sin abrir el log.
   - **Revisión interna del proceso.** Se detectó que un apagado durante un envío perdía el resultado del lote, que un fallo al cerrar la conexión SMTP podía duplicar correos y que con MongoDB caído el lote seguía enviando. Se corrigió con `RunCompletion`, la factura como unidad de trabajo (envío y actualización sin token cancelable; el correo cuenta como entregado en cuanto el servidor lo acepta) y el corte del lote con `StoppedPersistenceUnavailable`, con pruebas para cada caso.
 
 ## 7. Guía de verificación
@@ -212,7 +212,7 @@ Para un SMTP real solo cambian variables: `Smtp__Port=587` + `Smtp__Security=Sta
 
 ### D. Capturas
 
-Tomadas con la versión entregada, contra MongoDB 8.0.34 y Mailpit 1.31.6 reales.
+Tomadas con la aplicación funcionando contra MongoDB y Mailpit reales.
 
 ![Interfaz inicial: 4 / 3 / 1 / 2 y los tres clientes](img/01-resumen-inicial.png)
 

@@ -6,7 +6,10 @@ name: invoice-reminders
 
 services:
   mongo:
-    image: mongo:8.0
+    # MongoDB 7.0 y no 8.x: MongoDB 8 se niega a arrancar en kernels Linux 6.19 o superiores
+    # (incompatibilidad conocida, SERVER-121912). Docker usa el kernel del equipo anfitrión, así que
+    # con 8.x el contenedor fallaría en máquinas con kernel reciente. 7.0 tiene soporte hasta 2027.
+    image: mongo:7.0
     volumes:
       - mongo_data:/data/db
     ports:

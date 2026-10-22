@@ -2,7 +2,7 @@
 
 **Proyecto:** `invoice-reminders` · **Fecha:** 2026-10-21 · Primer build: 3-6 minutos; el resto del guion no requiere esperas.
 
-Esta guía recorre, paso a paso y con resultados esperados, todo lo que el sistema promete. La arquitectura está en [ARQUITECTURA.md](ARQUITECTURA.md); las decisiones en [DECISIONES.md](DECISIONES.md). Las capturas de `img/` se tomaron con la versión entregada, contra MongoDB 8.0.34 y Mailpit 1.31.6 reales.
+Esta guía recorre, paso a paso y con resultados esperados, todo lo que el sistema promete. La arquitectura está en [ARQUITECTURA.md](ARQUITECTURA.md); las decisiones en [DECISIONES.md](DECISIONES.md). Las capturas de `img/` se tomaron con la aplicación funcionando contra MongoDB y Mailpit reales, y la guía completa se repitió con el docker compose final desde un clon limpio.
 
 ---
 
@@ -187,9 +187,9 @@ En el Explorador de pruebas (*Prueba > Explorador de pruebas > Ejecutar todas*) 
 | Síntoma | Causa y solución |
 |---|---|
 | `docker compose up` falla con "port is already allocated" (8080, 8025, 1025 o 27017) | Copie `.env.example` a `.env` y cambie `APP_PORT`, `MAILPIT_PORT`, `SMTP_PORT` o `MONGO_PORT`. El compose funciona sin `.env`; solo hace falta si un puerto está ocupado. Si cambia `APP_PORT` o `MAILPIT_PORT`, use esos puertos en las URLs de la sección 3. |
-| El build se detiene o Docker Desktop reporta falta de memoria / errores de WSL2 | Asigne más memoria a Docker Desktop (o a WSL2), cierre otros contenedores y repita `docker compose up --build`. El primer build descarga las imágenes `sdk:10.0`, `aspnet:10.0`, `node:22-alpine`, `mongo:8.0` y `axllent/mailpit:v1.31.6`. |
+| El build se detiene o Docker Desktop reporta falta de memoria / errores de WSL2 | Asigne más memoria a Docker Desktop (o a WSL2), cierre otros contenedores y repita `docker compose up --build`. El primer build descarga las imágenes `sdk:10.0`, `aspnet:10.0`, `node:22-alpine`, `mongo:7.0` y `axllent/mailpit:v1.31.6`. |
 | El build falla descargando paquetes (`npm install`/`npm ci` o `dotnet restore`) detrás de un proxy corporativo | Configure el proxy en la configuración de Docker Desktop para que las etapas `web` (npm) y `build` (NuGet) del Dockerfile tengan salida a internet, y repita el build. |
 | El contenedor `app` aparece como `Exited` y la UI no responde | No hay `restart` a propósito: `docker compose logs app` muestra la causa en la última línea. Casos típicos: variable de configuración inválida (el mensaje cita la propiedad y la variable, p. ej. `Smtp__Host`), Mongo no disponible tras 15 intentos, o error al sembrar. Corrija y vuelva a levantar. |
-| `mongo` se reinicia o termina al arrancar en un equipo x86-64 antiguo o una VM | MongoDB ≥ 5.0 exige AVX en x86-64; `mongo:8.0` no arranca sin él (ARM64/Apple Silicon no se ve afectado). No hay tag alternativo soportado: use otra máquina o habilite AVX en la VM. |
+| `mongo` se reinicia o termina al arrancar en un equipo x86-64 antiguo o una VM | MongoDB ≥ 5.0 exige AVX en x86-64; `mongo:7.0` no arranca sin él (ARM64/Apple Silicon no se ve afectado). No hay tag alternativo soportado: use otra máquina o habilite AVX en la VM. |
 
 Diagnóstico general: `docker compose ps` (estado y healthchecks), `docker compose logs app`, `http://localhost:8080/health/ready`.

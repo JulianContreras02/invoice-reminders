@@ -108,11 +108,19 @@ jobs:
       - name: Verificación de la guía (7, 4 y 0 correos)
         run: bash .github/scripts/compose-smoke.sh
 
+      # Además del log completo, deja las últimas líneas de cada contenedor como anotación del
+      # trabajo, visible en el resumen de la ejecución sin necesidad de abrir el log.
       - name: Diagnóstico de los contenedores
         if: failure()
         run: |
           docker compose ps -a
           docker compose logs --no-color
+          for service in $(docker compose ps -a --services); do
+            lines=$(docker compose logs --no-color --tail 8 "$service" 2>&1 | tail -c 1500 | tr -d '\r')
+            lines=${lines//'%'/'%25'}
+            lines=${lines//$'\n'/'%0A'}
+            echo "::error title=Últimas líneas de ${service}::${lines}"
+          done
 
       - name: Apagar
         if: always()
